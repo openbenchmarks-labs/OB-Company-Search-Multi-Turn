@@ -1,5 +1,18 @@
 tool: linkup
 setups:
+  linkup_deep:
+    provider_slug: linkup-deep
+    provider_name: Linkup deep
+    config_slug: linkup-deep
+    endpoint: POST /v1/search depth=deep
+    env_keys: [LINKUP_API_KEY]
+    native_fetch: true
+    fetch_endpoint: POST /v1/fetch
+    fetch_kind: linkup_fetch
+    request_config: {depth: deep, outputType: searchResults}
+    pricing:
+      search_usd: 0.05
+      fetch_usd: 0.001
   linkup_fast:
     provider_slug: linkup-fast
     provider_name: Linkup fast

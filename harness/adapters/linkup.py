@@ -10,10 +10,12 @@ from ..tool_api import VendorCall, VendorSpec, hit, page
 
 
 def search(spec: VendorSpec, query: str, max_results: int, search_context_size: str | None) -> VendorCall:
+    depth = spec.request_config["depth"]
     return tool_api.request(
         method="POST", url="https://api.linkup.so/v1/search",
         headers={"Authorization": f"Bearer {os.environ['LINKUP_API_KEY']}", "Content-Type": "application/json"},
-        body={"q": query, "depth": spec.request_config["depth"], "outputType": "searchResults", "maxResults": max_results},
+        body={"q": query, "depth": depth, "outputType": "searchResults", "maxResults": max_results},
+        timeout=180 if depth == "deep" else 90,
     )
 
 
