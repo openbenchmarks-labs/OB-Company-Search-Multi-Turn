@@ -83,14 +83,14 @@ class SearchToolsTest(unittest.TestCase):
                 "context", "nimble_lite", "nimble_standard", "brave", "exa_deep", "exa_instant", "firecrawl", "linkup_fast",
                 "linkup_standard", "parallel_advanced", "parallel_basic",
                 "parallel_fast", "parallel_turbo", "seltz_companies", "serp",
-                "tavily_advanced", "tavily_basic", "you_highlights", "you_highlights_core", "tinyfish", "perplexity",
+                "tavily_advanced", "tavily_basic", "you_highlights", "you_highlights_core", "tinyfish", "perplexity", "string",
             },
         )
         capabilities = {row["vendor"]: row for row in capability_inventory()}
         for key in (
             "context", "exa_deep", "exa_instant", "firecrawl", "linkup_fast",
             "linkup_standard", "parallel_advanced", "parallel_basic",
-            "parallel_fast", "parallel_turbo", "tavily_advanced", "tavily_basic", "you_highlights", "you_highlights_core", "tinyfish",
+            "parallel_fast", "parallel_turbo", "tavily_advanced", "tavily_basic", "you_highlights", "you_highlights_core", "tinyfish", "string",
         ):
             self.assertTrue(capabilities[key]["native_fetch"])
         for key in ("brave", "seltz_companies", "serp", "perplexity"):
@@ -123,6 +123,7 @@ class SearchToolsTest(unittest.TestCase):
             "you_highlights": {"results": {"web": [{"url": "https://a.test", "title": "A", "snippets": ["one"]}]}},
             "tinyfish": {"results": [{"url": "https://a.test", "title": "A", "snippet": "one"}]},
             "perplexity": {"results": [{"url": "https://a.test", "title": "A", "snippet": "one"}]},
+            "string": {"results": [{"position": 1, "url": "https://a.test", "title": "A", "snippet": "one"}]},
         }
         fixtures["you_highlights_core"] = fixtures["you_highlights"]
         fixtures["nimble_lite"] = {"results": [{"url": "https://a.test", "title": "A", "description": "one"}]}

@@ -90,6 +90,13 @@ def redact_headers(headers: dict[str, str]) -> dict[str, str]:
 
 
 def json_or_text(response: Any) -> Any:
+    headers = getattr(response, "headers", None) or {}
+    if str(headers.get("content-type") or "").lower().startswith("text/markdown"):
+        # String answers a fetch with the page itself and the destination status header.
+        return {
+            "_markdown": str(getattr(response, "text", ""))[:100_000],
+            "_status_code": headers.get("x-status-code"),
+        }
     try:
         return response.json()
     except ValueError:

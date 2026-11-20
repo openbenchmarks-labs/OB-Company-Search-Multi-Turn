@@ -25,6 +25,7 @@ TOOLS = (
     "tavily",
     "tinyfish",
     "perplexity",
+    "string",
     "nimble",
     "you",
 )

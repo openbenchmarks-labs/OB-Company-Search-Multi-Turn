@@ -1,0 +1,17 @@
+tool: string
+# Starter list prices, read 2026-11-20: $1.20 per 1,000 searches, $0.25 per 1,000 standard-proxy fetches.
+# https://usestring.ai/pricing
+setups:
+  string:
+    provider_slug: string-search
+    provider_name: String
+    config_slug: string
+    endpoint: POST /v1/search engine=google
+    env_keys: [STRING_API_KEY]
+    native_fetch: true
+    fetch_endpoint: POST /v1/fetch
+    fetch_kind: string_fetch
+    request_config: {engine: google, format: markdown, markdownMode: readable}
+    pricing:
+      search_usd: 0.0012
+      fetch_usd: 0.00025
