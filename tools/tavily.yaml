@@ -1,0 +1,28 @@
+tool: tavily
+setups:
+  tavily_advanced:
+    provider_slug: tavily-advanced
+    provider_name: Tavily advanced
+    config_slug: tavily-advanced
+    endpoint: POST /search search_depth=advanced
+    env_keys: [TAVILY_API_KEY]
+    native_fetch: true
+    fetch_endpoint: POST /extract
+    fetch_kind: tavily_extract
+    request_config: {search_depth: advanced, chunks_per_source: 3}
+    pricing:
+      search_usd: 0.016
+      fetch_usd: 0.0032
+  tavily_basic:
+    provider_slug: tavily-basic
+    provider_name: Tavily basic
+    config_slug: tavily-basic
+    endpoint: POST /search search_depth=basic
+    env_keys: [TAVILY_API_KEY]
+    native_fetch: true
+    fetch_endpoint: POST /extract
+    fetch_kind: tavily_extract
+    request_config: {search_depth: basic}
+    pricing:
+      search_usd: 0.008
+      fetch_usd: 0.0016

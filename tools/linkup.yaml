@@ -1,0 +1,28 @@
+tool: linkup
+setups:
+  linkup_fast:
+    provider_slug: linkup-fast
+    provider_name: Linkup fast
+    config_slug: linkup-fast
+    endpoint: POST /v1/search depth=fast
+    env_keys: [LINKUP_API_KEY]
+    native_fetch: true
+    fetch_endpoint: POST /v1/fetch
+    fetch_kind: linkup_fetch
+    request_config: {depth: fast, outputType: searchResults}
+    pricing:
+      search_usd: 0.005
+      fetch_usd: 0.001
+  linkup_standard:
+    provider_slug: linkup-standard
+    provider_name: Linkup standard
+    config_slug: linkup-standard
+    endpoint: POST /v1/search depth=standard
+    env_keys: [LINKUP_API_KEY]
+    native_fetch: true
+    fetch_endpoint: POST /v1/fetch
+    fetch_kind: linkup_fetch
+    request_config: {depth: standard, outputType: searchResults}
+    pricing:
+      search_usd: 0.005
+      fetch_usd: 0.001

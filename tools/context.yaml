@@ -1,0 +1,19 @@
+tool: context
+# Developer plan: $3.00 per 1,000 credits, read 2026-11-20 (https://www.context.dev/pricing).
+# A search with highlights costs two credits per 10 results; a markdown scrape costs one.
+usd_per_credit: 0.003
+setups:
+  context:
+    provider_slug: context
+    provider_name: Context.dev
+    config_slug: context
+    endpoint: POST /v1/web/search
+    env_keys: [CONTEXT_API_KEY]
+    native_fetch: true
+    fetch_endpoint: GET /v1/web/scrape/markdown
+    fetch_kind: context_markdown
+    request_config:
+      highlightsOptions: {enabled: true, maxCharacters: 4000}
+    pricing:
+      search_usd: 0.006
+      fetch_usd: 0.003

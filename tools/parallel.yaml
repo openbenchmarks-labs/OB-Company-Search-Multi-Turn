@@ -1,0 +1,55 @@
+tool: parallel
+# source_policy moves site: filters in the query into Parallel's include_domains setting.
+setups:
+  parallel_advanced:
+    provider_slug: parallel-advanced
+    provider_name: Parallel advanced
+    config_slug: parallel-advanced
+    endpoint: POST /v1/search mode=advanced
+    env_keys: [PARALLEL_API_KEY]
+    native_fetch: true
+    fetch_endpoint: POST /v1/extract
+    fetch_kind: parallel_extract
+    request_config: {mode: advanced, site_operator_policy: source_policy}
+    pricing:
+      search_usd: 0.005
+      fetch_usd: 0.001
+  parallel_basic:
+    provider_slug: parallel-basic
+    provider_name: Parallel basic
+    config_slug: parallel-basic
+    endpoint: POST /v1/search mode=basic
+    env_keys: [PARALLEL_API_KEY]
+    native_fetch: true
+    fetch_endpoint: POST /v1/extract
+    fetch_kind: parallel_extract
+    request_config: {mode: basic, site_operator_policy: source_policy}
+    pricing:
+      search_usd: 0.005
+      fetch_usd: 0.001
+  parallel_fast:
+    provider_slug: parallel-fast
+    provider_name: Parallel fast
+    config_slug: parallel-fast
+    endpoint: POST /v1/search mode=fast
+    env_keys: [PARALLEL_API_KEY]
+    native_fetch: true
+    fetch_endpoint: POST /v1/extract
+    fetch_kind: parallel_extract
+    request_config: {mode: fast, site_operator_policy: source_policy}
+    pricing:
+      search_usd: 0.001
+      fetch_usd: 0.001
+  parallel_turbo:
+    provider_slug: parallel-turbo
+    provider_name: Parallel turbo
+    config_slug: parallel-turbo
+    endpoint: POST /v1/search mode=turbo
+    env_keys: [PARALLEL_API_KEY]
+    native_fetch: true
+    fetch_endpoint: POST /v1/extract
+    fetch_kind: parallel_extract
+    request_config: {mode: turbo, site_operator_policy: source_policy}
+    pricing:
+      search_usd: 0.001
+      fetch_usd: 0.001

@@ -1,0 +1,32 @@
+tool: exa
+setups:
+  exa_deep:
+    provider_slug: exa-deep
+    provider_name: Exa deep
+    config_slug: exa-deep
+    endpoint: POST /search type=deep
+    env_keys: [EXA_API_KEY]
+    native_fetch: true
+    fetch_endpoint: POST /contents
+    fetch_kind: exa_contents
+    request_config:
+      type: deep
+      contents: {highlights: true}
+    pricing:
+      search_usd: 0.012
+      fetch_usd: 0.001
+  exa_instant:
+    provider_slug: exa-instant
+    provider_name: Exa instant
+    config_slug: exa-instant
+    endpoint: POST /search type=instant
+    env_keys: [EXA_API_KEY]
+    native_fetch: true
+    fetch_endpoint: POST /contents
+    fetch_kind: exa_contents
+    request_config:
+      type: instant
+      contents: {highlights: true}
+    pricing:
+      search_usd: 0.007
+      fetch_usd: 0.001

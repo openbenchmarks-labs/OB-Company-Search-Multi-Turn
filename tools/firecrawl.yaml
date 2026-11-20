@@ -1,0 +1,15 @@
+tool: firecrawl
+setups:
+  firecrawl:
+    provider_slug: firecrawl-search
+    provider_name: Firecrawl
+    config_slug: firecrawl
+    endpoint: POST /v2/search
+    env_keys: [FIRECRAWL_API_KEY]
+    native_fetch: true
+    fetch_endpoint: POST /v2/scrape
+    fetch_kind: firecrawl_scrape
+    request_config: {}
+    pricing:
+      search_usd: 0.005
+      fetch_usd: 0.0025

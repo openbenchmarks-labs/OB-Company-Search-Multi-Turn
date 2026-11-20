@@ -1,0 +1,13 @@
+tool: serp
+setups:
+  serp:
+    provider_slug: serp-rapidapi
+    provider_name: SERP (RapidAPI)
+    config_slug: serp
+    endpoint: GET google-search74.p.rapidapi.com
+    env_keys: [RAPIDAPI_KEY]
+    native_fetch: false
+    custom_fetch: true
+    request_config: {limit: 10}
+    pricing:
+      search_usd: 0.003

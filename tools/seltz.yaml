@@ -1,0 +1,13 @@
+tool: seltz
+setups:
+  seltz_companies:
+    provider_slug: seltz-companies
+    provider_name: Seltz companies
+    config_slug: seltz-companies
+    endpoint: POST /v1/search scope=companies
+    env_keys: [SELTZ_API_KEY]
+    native_fetch: false
+    custom_fetch: true
+    request_config: {scope: companies}
+    pricing:
+      search_usd: 0.005

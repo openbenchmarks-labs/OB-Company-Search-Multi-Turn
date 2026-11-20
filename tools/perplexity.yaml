@@ -1,0 +1,15 @@
+tool: perplexity
+setups:
+  perplexity:
+    provider_slug: perplexity-search
+    provider_name: Perplexity
+    config_slug: perplexity
+    endpoint: POST /search
+    env_keys: [PERPLEXITY_API_KEY]
+    native_fetch: false
+    custom_fetch: true
+    request_config:
+      max_results: 10
+      search_context_size_by_research_mode: {search_only: low, search_and_fetch: high}
+    pricing:
+      search_usd: 0.005

@@ -1,0 +1,7 @@
+name: OB-Company-Search-Multi-Turn
+order:
+  serves: Teams choosing a web search API for a multi-turn company research agent.
+  win: Higher accuracy on multi-turn company discovery questions under the same model, search budget, and day.
+  budget_usd: 0
+  refresh_days: 30
+  not_measured_max: 0.1

@@ -1,0 +1,13 @@
+tool: brave
+setups:
+  brave:
+    provider_slug: brave-search
+    provider_name: Brave Search
+    config_slug: brave
+    endpoint: GET /res/v1/web/search
+    env_keys: [BRAVE_SEARCH_API_KEY]
+    native_fetch: false
+    custom_fetch: true
+    request_config: {count: 10, result_filter: web}
+    pricing:
+      search_usd: 0.005

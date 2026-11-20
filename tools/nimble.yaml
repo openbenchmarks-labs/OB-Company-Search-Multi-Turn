@@ -1,0 +1,29 @@
+tool: nimble
+# Extract has no list price. Set NIMBLE_EXTRACT_USD_PER_REQUEST to your own rate; unset means unknown, not free.
+setups:
+  nimble_lite:
+    provider_slug: nimble-lite
+    provider_name: Nimble lite
+    config_slug: nimble-lite
+    endpoint: POST /v2/search search_depth=lite full_content=false
+    env_keys: [NIMBLE_API_KEY]
+    native_fetch: true
+    fetch_endpoint: POST /v2/extract
+    fetch_kind: nimble_extract
+    request_config: {search_depth: lite, full_content: false, focus: general}
+    pricing:
+      search_usd: 0.0011
+      fetch_usd: null
+  nimble_standard:
+    provider_slug: nimble-standard
+    provider_name: Nimble standard
+    config_slug: nimble-standard
+    endpoint: POST /v2/search search_depth=standard full_content=false
+    env_keys: [NIMBLE_API_KEY]
+    native_fetch: true
+    fetch_endpoint: POST /v2/extract
+    fetch_kind: nimble_extract
+    request_config: {search_depth: standard, full_content: false, focus: general}
+    pricing:
+      search_usd: 0.005
+      fetch_usd: null

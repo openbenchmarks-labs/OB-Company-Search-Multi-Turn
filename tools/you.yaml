@@ -1,0 +1,33 @@
+tool: you
+setups:
+  you_highlights:
+    provider_slug: you-highlights
+    provider_name: You highlights
+    config_slug: you-highlights
+    endpoint: POST /v1/search
+    env_keys: [YOU_API_KEY]
+    native_fetch: true
+    fetch_endpoint: POST /v1/contents
+    fetch_kind: you_contents
+    request_config:
+      count: 10
+      extraction: {extraction_mode: highlights}
+    pricing:
+      search_usd: 0.005
+      fetch_usd: 0.001
+  you_highlights_core:
+    provider_slug: you-highlights-core
+    provider_name: You highlights core
+    config_slug: you-highlights-core
+    endpoint: POST /v1/search
+    env_keys: [YOU_API_KEY]
+    native_fetch: true
+    fetch_endpoint: POST /v1/contents
+    fetch_kind: you_contents
+    request_config:
+      count: 10
+      extraction: {extraction_mode: highlights}
+      knowledge: core
+    pricing:
+      search_usd: 0.005
+      fetch_usd: 0.001

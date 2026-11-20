@@ -1,0 +1,15 @@
+tool: tinyfish
+setups:
+  tinyfish:
+    provider_slug: tinyfish-search
+    provider_name: TinyFish
+    config_slug: tinyfish
+    endpoint: GET api.search.tinyfish.ai
+    env_keys: [TINYFISH_API_KEY]
+    native_fetch: true
+    fetch_endpoint: POST api.fetch.tinyfish.ai
+    fetch_kind: tinyfish_fetch
+    request_config: {}
+    pricing:
+      search_usd: 0.0
+      fetch_usd: 0.0
