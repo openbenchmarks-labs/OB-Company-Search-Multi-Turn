@@ -409,7 +409,10 @@ def run_agent(
                         conversation.append(_tool_output(call, {"error": "URL must exactly match a prior search result"}))
                         continue
                     fetches_this_turn += 1
-                    vendor_call = fetch(vendor_key, url, objective=question)
+                    try:
+                        vendor_call = fetch(vendor_key, url, objective=question)
+                    except Exception as exc:  # noqa: BLE001 - recorded, the trial continues
+                        vendor_call = VendorCall("error", 0, {"url": url}, None, f"{type(exc).__name__}: {exc}", [], 0.0)
                     result.fetches.append(FetchTrace(turn_index, len(result.fetches) + 1, call_id, url, vendor_call))
                     conversation.append(_tool_output(call, {"page": vendor_call.page, "error": vendor_call.error}))
                 else:
