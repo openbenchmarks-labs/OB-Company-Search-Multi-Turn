@@ -1,4 +1,4 @@
-# OB-Company-Search-Multi-Turn
+# OB-Company-Search (Multi-Turn)
 
 Open, independent benchmark of web search APIs for research agents: which search API helps a multi-turn agent find and verify companies that match several criteria at once, such as investor, accelerator, funding and location. A BrowseComp alternative built on fresh company sets that models cannot recall. The agent, model, search budget and run day stay fixed; only the search configuration changes. Search APIs measured: Brave, Context, Exa, Firecrawl, Linkup, Nimble, Parallel, Perplexity, Seltz, SERP, Tavily, TinyFish and You.com.
 
