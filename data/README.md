@@ -4,7 +4,7 @@ No question files are committed to this folder.
 
 ## Public vs. held-out evaluation sets
 
-- **Public split:** Published on Hugging Face at [`openbenchmarks/OB-Company-Websearch`](https://huggingface.co/datasets/openbenchmarks/OB-Company-Websearch).
+- **Public split:** Published on Hugging Face at [`openbenchmarks/OB-Company-Search-Multi-Turn`](https://huggingface.co/datasets/openbenchmarks/OB-Company-Search-Multi-Turn).
 - **Held-out split (private):** The evaluation set used for the published leaderboard stays private so tools cannot train on it. Pass your dataset file to the runner with `--dataset <file>.json`.
 
 ## Files and schema

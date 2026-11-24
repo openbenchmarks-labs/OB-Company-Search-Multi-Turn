@@ -2,7 +2,7 @@
 
 Open, independent benchmark of web search APIs for research agents: which search API helps a multi-turn agent find and verify companies that match several criteria at once, such as investor, accelerator, funding and location. A BrowseComp alternative built on fresh company sets that models cannot recall. The agent, model, search budget and run day stay fixed; only the search configuration changes. Search APIs measured: Brave, Context, Exa, Firecrawl, Linkup, Nimble, Parallel, Perplexity, Seltz, SERP, Tavily, TinyFish and You.com.
 
-**Live leaderboard:** [openbenchmarks.com/multi-turn-company-search](https://openbenchmarks.com/multi-turn-company-search) · **Public dataset:** [`openbenchmarks/OB-Company-Websearch`](https://huggingface.co/datasets/openbenchmarks/OB-Company-Websearch)
+**Live leaderboard:** [openbenchmarks.com/multi-turn-company-search](https://openbenchmarks.com/multi-turn-company-search) · **Public dataset:** [`openbenchmarks/OB-Company-Search-Multi-Turn`](https://huggingface.co/datasets/openbenchmarks/OB-Company-Search-Multi-Turn)
 
 Published and maintained by **[OpenBenchmarks Labs](https://openbenchmarks.com)**.
 
@@ -24,7 +24,7 @@ Each question asks a multi-turn research agent to discover and verify a set of c
 
 No question files are committed to this repository.
 
-- **Public split:** Published on Hugging Face at [`openbenchmarks/OB-Company-Websearch`](https://huggingface.co/datasets/openbenchmarks/OB-Company-Websearch).
+- **Public split:** Published on Hugging Face at [`openbenchmarks/OB-Company-Search-Multi-Turn`](https://huggingface.co/datasets/openbenchmarks/OB-Company-Search-Multi-Turn).
 - **Held-out split:** The private evaluation set used for the published leaderboard stays private so tools cannot train on it. Pass your dataset file with `--dataset <file>.json` (validated against `content_sha256` before any run starts).
 
 See [`data/README.md`](data/README.md) for the complete dataset schema.
@@ -70,13 +70,13 @@ Build the leaderboard from saved runs:
 
 - [Live leaderboard](https://openbenchmarks.com/multi-turn-company-search)
 - [Most accurate](https://openbenchmarks.com/multi-turn-company-search/most-accurate-search-api), [fastest](https://openbenchmarks.com/multi-turn-company-search/fastest-search-api) and [cheapest](https://openbenchmarks.com/multi-turn-company-search/cheapest-search-api) search APIs for research agents
-- [Hugging Face dataset](https://huggingface.co/datasets/openbenchmarks/OB-Company-Websearch)
+- [Hugging Face dataset](https://huggingface.co/datasets/openbenchmarks/OB-Company-Search-Multi-Turn)
 - [`llms.txt`](https://openbenchmarks.com/llms.txt)
 
 ## Related benchmarks
 
 - [OB-Company-Search-Lookalikes](https://github.com/openbenchmarks-labs/OB-Company-Search-Lookalikes): Company lookalike discovery ([leaderboard](https://openbenchmarks.com/lookalikes))
-- [OB-Code-Websearch](https://github.com/openbenchmarks-labs/OB-Code-Websearch): Web search APIs for coding agents ([leaderboard](https://openbenchmarks.com/web-search-for-coding-agents))
+- [OB-Code-WebSearch](https://github.com/openbenchmarks-labs/OB-Code-WebSearch): Web search APIs for coding agents ([leaderboard](https://openbenchmarks.com/web-search-for-coding-agents))
 - [OB-Company-News](https://github.com/openbenchmarks-labs/OB-Company-News): Company news search and news-index APIs ([leaderboard](https://openbenchmarks.com/company-news))
 - [All OpenBenchmarks leaderboards](https://openbenchmarks.com)
 
