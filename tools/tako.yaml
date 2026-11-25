@@ -1,0 +1,18 @@
+tool: tako
+# The setup the board ran on the private set of version 1: web results with highlights, effort fast, pages through
+# Tako's contents API. Tako's search docs ask for a bare host in include_domains and never mention site:, so site:
+# filters move there. List prices as on OB-Code-Websearch.
+setups:
+  tako:
+    provider_slug: tako-search
+    provider_name: Tako
+    config_slug: tako
+    endpoint: POST /api/v3/search effort=fast
+    env_keys: [TAKO_API_KEY]
+    native_fetch: true
+    fetch_endpoint: POST /api/v1/contents
+    fetch_kind: tako_contents
+    request_config: {effort: fast, highlights: true, site_operator_policy: include_domains}
+    pricing:
+      search_usd: 0.007
+      fetch_usd: 0.001

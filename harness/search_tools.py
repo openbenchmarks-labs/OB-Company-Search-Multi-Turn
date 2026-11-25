@@ -28,6 +28,8 @@ TOOLS = (
     "perplexity",
     "nimble",
     "you",
+    "tako",
+    "keenable",
 )
 ADAPTERS = {tool: import_module(f"{__package__}.adapters.{tool}") for tool in TOOLS}
 

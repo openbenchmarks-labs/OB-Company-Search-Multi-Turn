@@ -1,0 +1,27 @@
+tool: keenable
+# Keenable's pro and realtime modes, with snippets up to 4,000 characters, the settings OpenBenchmarks ran.
+# Keenable has no page fetch, so pages come from the shared fetcher. It has no domain filter and applies site: in
+# the query itself, so site: stays as the agent wrote it. List price as on OB-Code-Websearch.
+setups:
+  keenable_pro:
+    provider_slug: keenable-pro
+    provider_name: Keenable pro
+    config_slug: keenable-pro
+    endpoint: POST /v1/search mode=pro
+    env_keys: [KEENABLE_API_KEY]
+    native_fetch: false
+    custom_fetch: true
+    request_config: {mode: pro, snippet_max_length: 4000}
+    pricing:
+      search_usd: 0.004
+  keenable_realtime:
+    provider_slug: keenable-realtime
+    provider_name: Keenable realtime
+    config_slug: keenable-realtime
+    endpoint: POST /v1/search mode=realtime
+    env_keys: [KEENABLE_API_KEY]
+    native_fetch: false
+    custom_fetch: true
+    request_config: {mode: realtime, snippet_max_length: 4000}
+    pricing:
+      search_usd: 0.004
