@@ -95,6 +95,12 @@ class JudgeTest(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "search_only/brave stopped early"):
             build_leaderboard(artifacts)
 
+    def test_an_answer_without_accents_matches_an_accented_list_name(self) -> None:
+        artifact = _artifact(1, correct=True)
+        artifact["case"]["gold"][0].update(name="Jüsto", domain="justo.mx", aliases=[])
+        artifact["parsed_companies"][0].update(name="Justo", domain=None)
+        self.assertEqual(score_artifact(artifact)["true_positive"], 1)
+
 
 if __name__ == "__main__":
     unittest.main()

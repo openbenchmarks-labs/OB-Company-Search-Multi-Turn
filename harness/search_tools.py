@@ -117,12 +117,16 @@ def search(vendor_key: str, query: str, *, max_results: int = 10) -> VendorCall:
     adapter = _ADAPTER_BY_SETUP[vendor_key]
     call = adapter.search(spec, query, max_results)
     call.cost_usd = _cost(vendor_key, call, spec.search_unit_cost_usd)
+    call.hits = []
     if call.status == "ok":
         payload = call.raw_response if isinstance(call.raw_response, dict) else {}
-        call.hits = dedupe(adapter.parse_hits(payload, max_results), max_results)
-        call.knowledge = adapter.parse_knowledge(payload, max_results) if hasattr(adapter, "parse_knowledge") else None
-    else:
-        call.hits = []
+        try:
+            call.hits = dedupe(adapter.parse_hits(payload, max_results), max_results)
+            call.knowledge = adapter.parse_knowledge(payload, max_results) if hasattr(adapter, "parse_knowledge") else None
+        except Exception as exc:  # noqa: BLE001
+            call.status = "error"
+            call.error = f"unreadable search reply: {type(exc).__name__}: {exc}"
+            call.hits = []
     return call
 
 

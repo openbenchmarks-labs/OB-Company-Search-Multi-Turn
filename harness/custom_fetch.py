@@ -221,7 +221,8 @@ def fetch_http(
                 bytes_read += min(len(chunk), remaining)
                 if bytes_read >= max_bytes:
                     break
-            encoding = response.encoding or "utf-8"
+            declared = "charset=" in response.headers.get("Content-Type", "").lower()
+            encoding = (response.encoding if declared else None) or "utf-8"
             raw = b"".join(chunks).decode(encoding, errors="replace")
             status_code = response.status_code
             response.close()

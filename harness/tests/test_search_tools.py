@@ -132,6 +132,16 @@ class SearchToolsTest(unittest.TestCase):
                 if vendor == "context":
                     self.assertEqual(parse_hits(vendor, payload, 10)[0]["snippet"], "one")
 
+    def test_an_unreadable_search_reply_is_a_failed_search_not_a_crash(self) -> None:
+        reply = VendorCall(
+            status="ok", latency_ms=1, raw_request={}, raw_response={"results": "not a list"},
+            error=None, attempts=[], cost_usd=None,
+        )
+        with patch("harness.adapters.tavily.search", return_value=reply):
+            call = search("tavily_basic", "funding", max_results=10)
+        self.assertEqual((call.status, call.hits), ("error", []))
+        self.assertIn("unreadable search reply", call.error)
+
     def test_public_board_search_request_contracts(self) -> None:
         fixtures = {
             "you_highlights": ("YOU_API_KEY", "https://ydc-index.io/v1/search", "POST"),

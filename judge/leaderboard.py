@@ -5,6 +5,7 @@ from __future__ import annotations
 import argparse
 import json
 import statistics
+import unicodedata
 from collections import defaultdict
 from pathlib import Path
 from typing import Any, Iterable
@@ -24,6 +25,12 @@ def _domain(value: Any) -> str:
     return (parsed.hostname or "").removeprefix("www.").rstrip(".")
 
 
+def _name(value: Any) -> str:
+    """Match names with accents folded, so Jüsto and Justo agree; entity keys keep the dataset's own form."""
+    folded = unicodedata.normalize("NFKD", str(value or ""))
+    return normalize_company_name("".join(c for c in folded if not unicodedata.combining(c)))
+
+
 def _gold_lookup(gold: list[dict[str, Any]]) -> tuple[set[str], dict[str, str]]:
     identities: set[str] = set()
     lookup: dict[str, str] = {}
@@ -34,7 +41,7 @@ def _gold_lookup(gold: list[dict[str, Any]]) -> tuple[set[str], dict[str, str]]:
         if domain:
             lookup[f"domain:{domain}"] = identity
         for name in [member.get("name"), *(member.get("aliases") or [])]:
-            normalized = normalize_company_name(str(name or ""))
+            normalized = _name(name)
             if normalized:
                 lookup[f"name:{normalized}"] = identity
     return identities, lookup
@@ -48,7 +55,7 @@ def score_artifact(artifact: dict[str, Any]) -> dict[str, Any]:
     if artifact.get("result", {}).get("status") == "ok" and not artifact.get("parse_error"):
         for index, company in enumerate(artifact.get("parsed_companies") or []):
             domain_key = f"domain:{_domain(company.get('domain'))}"
-            name_key = f"name:{normalize_company_name(str(company.get('name') or ''))}"
+            name_key = f"name:{_name(company.get('name'))}"
             identity = lookup.get(domain_key) if _domain(company.get("domain")) else None
             identity = identity or lookup.get(name_key) or f"prediction:{index}:{name_key}"
             if identity not in predicted and company.get("cited_urls"):
