@@ -6,19 +6,14 @@ import os
 from typing import Any
 
 from .. import tool_api
-from ..tool_api import VendorCall, VendorSpec, hit, page, site_scoped
+from ..tool_api import VendorCall, VendorSpec, hit, page
 
 
 def search(spec: VendorSpec, query: str, max_results: int) -> VendorCall:
-    sent_query, include_domains = site_scoped(spec, query)
-    body = {key: value for key, value in spec.request_config.items() if key != "site_operator_policy"}
-    body.update(query=sent_query, count=min(max_results, 20))
-    if include_domains:
-        body["include_domains"] = include_domains
     return tool_api.request(
         method="POST", url="https://ydc-index.io/v1/search",
         headers={"X-API-Key": os.environ["YOU_API_KEY"], "Content-Type": "application/json"},
-        body=body,
+        body={**spec.request_config, "query": query, "count": min(max_results, 20)},
     )
 
 

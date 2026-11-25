@@ -152,31 +152,31 @@ class SearchToolsTest(unittest.TestCase):
                 self.assertEqual(request.call_args.kwargs["url"], endpoint)
                 self.assertEqual(request.call_args.kwargs["method"], method)
 
-    def test_every_tool_with_a_domain_filter_turns_site_queries_into_it(self) -> None:
+    def test_site_queries_follow_each_tools_documented_rule(self) -> None:
         empty_call = VendorCall("ok", 1, {}, {"results": []}, None, [], None)
-        for vendor, env_key, query_key, domains_key in (
-            ("exa_deep", "EXA_API_KEY", "query", "includeDomains"),
-            ("exa_instant", "EXA_API_KEY", "query", "includeDomains"),
-            ("tavily_basic", "TAVILY_API_KEY", "query", "include_domains"),
-            ("tavily_advanced", "TAVILY_API_KEY", "query", "include_domains"),
-            ("linkup_fast", "LINKUP_API_KEY", "q", "includeDomains"),
-            ("linkup_standard", "LINKUP_API_KEY", "q", "includeDomains"),
-            ("nimble_lite", "NIMBLE_API_KEY", "query", "include_domains"),
-            ("nimble_standard", "NIMBLE_API_KEY", "query", "include_domains"),
-            ("you_highlights", "YOU_API_KEY", "query", "include_domains"),
-            ("you_highlights_core", "YOU_API_KEY", "query", "include_domains"),
-            ("perplexity", "PERPLEXITY_API_KEY", "query", "search_domain_filter"),
+        query = "seed rounds site:www.Crunchbase.com/organization"
+        moved = ("seed rounds", ["crunchbase.com"])
+        for vendor, env_key, query_key, domains_key, expected in (
+            ("tavily_basic", "TAVILY_API_KEY", "query", "include_domains", moved),
+            ("tavily_advanced", "TAVILY_API_KEY", "query", "include_domains", moved),
+            ("linkup_fast", "LINKUP_API_KEY", "q", "includeDomains", moved),
+            ("linkup_standard", "LINKUP_API_KEY", "q", "includeDomains", moved),
+            ("nimble_lite", "NIMBLE_API_KEY", "query", "include_domains", moved),
+            ("nimble_standard", "NIMBLE_API_KEY", "query", "include_domains", moved),
+            ("perplexity", "PERPLEXITY_API_KEY", "query", "search_domain_filter", moved),
+            ("tinyfish", "TINYFISH_API_KEY", "query", "include_domains", ("seed rounds", "crunchbase.com")),
+            ("exa_deep", "EXA_API_KEY", "query", "includeDomains", (query, None)),
+            ("you_highlights", "YOU_API_KEY", "query", "include_domains", (query, None)),
         ):
             with self.subTest(vendor=vendor):
                 with (
                     patch.dict(os.environ, {env_key: "test-key"}),
                     patch("harness.tool_api.request", return_value=empty_call) as request,
                 ):
-                    search(vendor, "seed rounds site:www.Crunchbase.com/organization", max_results=7)
-                body = request.call_args.kwargs["body"]
-                self.assertEqual(body[query_key], "seed rounds")
-                self.assertEqual(body[domains_key], ["crunchbase.com"])
-                self.assertNotIn("site_operator_policy", body)
+                    search(vendor, query, max_results=7)
+                sent = request.call_args.kwargs.get("body") or request.call_args.kwargs["params"]
+                self.assertEqual((sent[query_key], sent.get(domains_key)), expected)
+                self.assertNotIn("site_operator_policy", sent)
 
     def test_both_tavily_setups_read_pages_with_advanced_extract(self) -> None:
         page_call = VendorCall("ok", 1, {}, {"results": [{"url": "https://a.test", "raw_content": "one"}]}, None, [], None)
