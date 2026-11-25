@@ -16,7 +16,7 @@ Each question asks a multi-turn research agent to discover and verify a set of c
 
 ## Tools evaluated
 
-13 search tools configured in [`tools/`](tools/README.md):
+13 search tools configured in [`tools/`](tools/README.md), plus a no-search baseline (`none`):
 
 `brave`, `context`, `exa`, `firecrawl`, `linkup`, `nimble`, `parallel`, `perplexity`, `seltz`, `serp`, `tavily`, `tinyfish`, `you`
 

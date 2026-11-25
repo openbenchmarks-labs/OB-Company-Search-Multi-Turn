@@ -9,7 +9,7 @@ from .. import tool_api
 from ..tool_api import VendorCall, VendorSpec, hit
 
 
-def search(spec: VendorSpec, query: str, max_results: int, search_context_size: str | None) -> VendorCall:
+def search(spec: VendorSpec, query: str, max_results: int) -> VendorCall:
     return tool_api.request(
         method="GET", url="https://api.search.brave.com/res/v1/web/search",
         headers={"X-Subscription-Token": os.environ["BRAVE_SEARCH_API_KEY"], "Accept": "application/json"},

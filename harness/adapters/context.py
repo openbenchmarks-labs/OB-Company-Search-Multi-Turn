@@ -11,7 +11,7 @@ from ..tool_api import VendorCall, VendorSpec, hit, page
 USD_PER_CREDIT = tool_api.tool_config("context")["usd_per_credit"]
 
 
-def search(spec: VendorSpec, query: str, max_results: int, search_context_size: str | None) -> VendorCall:
+def search(spec: VendorSpec, query: str, max_results: int) -> VendorCall:
     return tool_api.request(
         method="POST", url="https://api.context.dev/v1/web/search",
         headers={"Authorization": f"Bearer {os.environ['CONTEXT_API_KEY']}", "Content-Type": "application/json"},

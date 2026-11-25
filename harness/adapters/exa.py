@@ -6,15 +6,19 @@ import os
 from typing import Any
 
 from .. import tool_api
-from ..tool_api import VendorCall, VendorSpec, hit, page
+from ..tool_api import VendorCall, VendorSpec, hit, page, site_scoped
 
 
-def search(spec: VendorSpec, query: str, max_results: int, search_context_size: str | None) -> VendorCall:
+def search(spec: VendorSpec, query: str, max_results: int) -> VendorCall:
     kind = spec.request_config["type"]
+    sent_query, include_domains = site_scoped(spec, query)
+    body: dict[str, Any] = {"query": sent_query, "type": kind, "numResults": max_results, "contents": {"highlights": True}}
+    if include_domains:
+        body["includeDomains"] = include_domains
     return tool_api.request(
         method="POST", url="https://api.exa.ai/search",
         headers={"x-api-key": os.environ["EXA_API_KEY"], "Content-Type": "application/json"},
-        body={"query": query, "type": kind, "numResults": max_results, "contents": {"highlights": True}},
+        body=body,
         timeout=120 if kind == "deep" else 60,
     )
 

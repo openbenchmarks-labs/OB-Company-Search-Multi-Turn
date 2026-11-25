@@ -4,7 +4,6 @@ import os
 import unittest
 from unittest.mock import patch
 
-from harness.adapters.parallel import parallel_site_policy
 from harness.search_tools import (
     VENDORS,
     capability_inventory,
@@ -13,7 +12,7 @@ from harness.search_tools import (
     read_page,
     search,
 )
-from harness.tool_api import VendorCall
+from harness.tool_api import VendorCall, split_site_filters
 
 
 class SearchToolsTest(unittest.TestCase):
@@ -25,7 +24,7 @@ class SearchToolsTest(unittest.TestCase):
         )
         query = "funding site:Crunchbase.com/org site:https://techcrunch.com/startups -site:reddit.com"
         self.assertEqual(
-            parallel_site_policy(query),
+            split_site_filters(query),
             ("funding -site:reddit.com", ["crunchbase.com", "techcrunch.com"]),
         )
         for key, mode in (
@@ -80,7 +79,7 @@ class SearchToolsTest(unittest.TestCase):
         self.assertEqual(
             set(VENDORS),
             {
-                "context", "nimble_lite", "nimble_standard", "brave", "exa_deep", "exa_instant", "firecrawl", "linkup_fast",
+                "no_search", "context", "nimble_lite", "nimble_standard", "brave", "exa_deep", "exa_instant", "firecrawl", "linkup_fast",
                 "linkup_standard", "parallel_advanced", "parallel_basic",
                 "parallel_fast", "parallel_turbo", "seltz_companies", "serp",
                 "tavily_advanced", "tavily_basic", "you_highlights", "you_highlights_core", "tinyfish", "perplexity",
@@ -91,16 +90,14 @@ class SearchToolsTest(unittest.TestCase):
             "context", "exa_deep", "exa_instant", "firecrawl", "linkup_fast",
             "linkup_standard", "parallel_advanced", "parallel_basic",
             "parallel_fast", "parallel_turbo", "tavily_advanced", "tavily_basic", "you_highlights", "you_highlights_core", "tinyfish",
+            "perplexity",
         ):
             self.assertTrue(capabilities[key]["native_fetch"])
-        for key in ("brave", "seltz_companies", "serp", "perplexity"):
+        for key in ("brave", "seltz_companies", "serp"):
             self.assertFalse(capabilities[key]["native_fetch"])
             self.assertTrue(capabilities[key]["custom_fetch"])
-        self.assertTrue(all(row["fetch_available"] for row in capabilities.values()))
-        self.assertEqual(
-            VENDORS["perplexity"].request_config["search_context_size_by_research_mode"],
-            {"search_only": "low", "search_and_fetch": "high"},
-        )
+        self.assertTrue(all(row["fetch_available"] for row in capabilities.values() if row["search"]))
+        self.assertFalse(capabilities["no_search"]["search"] or capabilities["no_search"]["fetch_available"])
 
     def test_every_vendor_response_shape_produces_ranked_hits(self) -> None:
         fixtures = {
@@ -127,7 +124,7 @@ class SearchToolsTest(unittest.TestCase):
         fixtures["you_highlights_core"] = fixtures["you_highlights"]
         fixtures["nimble_lite"] = {"results": [{"url": "https://a.test", "title": "A", "description": "one"}]}
         fixtures["nimble_standard"] = fixtures["nimble_lite"]
-        self.assertEqual(set(fixtures), set(VENDORS))
+        self.assertEqual(set(fixtures), {key for key, spec in VENDORS.items() if spec.web_search})
         for vendor, payload in fixtures.items():
             with self.subTest(vendor=vendor):
                 self.assertEqual(parse_hits(vendor, payload, 10)[0]["url"], "https://a.test")
@@ -154,23 +151,40 @@ class SearchToolsTest(unittest.TestCase):
                 self.assertEqual(request.call_args.kwargs["url"], endpoint)
                 self.assertEqual(request.call_args.kwargs["method"], method)
 
-    def test_perplexity_search_context_size_contract(self) -> None:
-        for context_size in ("low", "high"):
-            with self.subTest(context_size=context_size):
-                empty_call = VendorCall("ok", 1, {}, {"results": []}, None, [], None)
+    def test_every_tool_with_a_domain_filter_turns_site_queries_into_it(self) -> None:
+        empty_call = VendorCall("ok", 1, {}, {"results": []}, None, [], None)
+        for vendor, env_key, query_key, domains_key in (
+            ("exa_deep", "EXA_API_KEY", "query", "includeDomains"),
+            ("exa_instant", "EXA_API_KEY", "query", "includeDomains"),
+            ("tavily_basic", "TAVILY_API_KEY", "query", "include_domains"),
+            ("tavily_advanced", "TAVILY_API_KEY", "query", "include_domains"),
+            ("linkup_fast", "LINKUP_API_KEY", "q", "includeDomains"),
+            ("linkup_standard", "LINKUP_API_KEY", "q", "includeDomains"),
+            ("nimble_lite", "NIMBLE_API_KEY", "query", "include_domains"),
+            ("nimble_standard", "NIMBLE_API_KEY", "query", "include_domains"),
+        ):
+            with self.subTest(vendor=vendor):
                 with (
-                    patch.dict(os.environ, {"PERPLEXITY_API_KEY": "test-key"}),
+                    patch.dict(os.environ, {env_key: "test-key"}),
                     patch("harness.tool_api.request", return_value=empty_call) as request,
                 ):
-                    search(
-                        "perplexity",
-                        "company query",
-                        search_context_size=context_size,
-                    )
-                self.assertEqual(
-                    request.call_args.kwargs["body"]["search_context_size"],
-                    context_size,
-                )
+                    search(vendor, "seed rounds site:www.Crunchbase.com/organization", max_results=7)
+                body = request.call_args.kwargs["body"]
+                self.assertEqual(body[query_key], "seed rounds")
+                self.assertEqual(body[domains_key], ["crunchbase.com"])
+
+    def test_both_tavily_setups_read_pages_with_advanced_extract(self) -> None:
+        page_call = VendorCall("ok", 1, {}, {"results": [{"url": "https://a.test", "raw_content": "one"}]}, None, [], None)
+        for vendor in ("tavily_basic", "tavily_advanced"):
+            with self.subTest(vendor=vendor):
+                with (
+                    patch.dict(os.environ, {"TAVILY_API_KEY": "test-key"}),
+                    patch("harness.search_tools._assert_public_url"),
+                    patch("harness.tool_api.request", return_value=page_call) as request,
+                ):
+                    result = fetch(vendor, "https://a.test", objective="Find evidence")
+                self.assertEqual(request.call_args.kwargs["body"]["extract_depth"], "advanced")
+                self.assertEqual(result.cost_usd, 0.0032)
 
     def test_tavily_search_depth_contracts(self) -> None:
         empty_call = VendorCall("ok", 1, {}, {"results": []}, None, [], None)
@@ -196,6 +210,10 @@ class SearchToolsTest(unittest.TestCase):
     def test_public_board_native_fetch_response_shapes(self) -> None:
         fixtures = {
             "you_highlights": [{"url": "https://a.test", "title": "A", "markdown": "one"}],
+            "perplexity": {"results": [{
+                "url": "https://a.test", "markdown": "one", "status": {"type": "ok", "status_code": 200},
+                "metadata": {"source_url": "https://a.test/final", "title": "A"},
+            }]},
             "tinyfish": {
                 "results": [{
                     "url": "https://a.test",
@@ -215,10 +233,12 @@ class SearchToolsTest(unittest.TestCase):
         fixtures = {
             "you_highlights": ("YOU_API_KEY", "https://ydc-index.io/v1/contents"),
             "tinyfish": ("TINYFISH_API_KEY", "https://api.fetch.tinyfish.ai"),
+            "perplexity": ("PERPLEXITY_API_KEY", "https://api.perplexity.ai/v1/context"),
         }
         responses = {
             "you_highlights": [{"url": "https://a.test", "markdown": "one"}],
             "tinyfish": {"results": [{"url": "https://a.test", "text": "one"}]},
+            "perplexity": {"results": [{"url": "https://a.test", "markdown": "one", "status": {"type": "ok"}}]},
         }
         for vendor, (env_key, endpoint) in fixtures.items():
             with self.subTest(vendor=vendor):
@@ -241,7 +261,7 @@ class SearchToolsTest(unittest.TestCase):
             "title": "A", "text": "one", "truncated": False,
             "fetch_provider": "http",
         }) as custom_fetch:
-            result = fetch("perplexity", "https://a.test", objective="Find evidence")
+            result = fetch("brave", "https://a.test", objective="Find evidence")
         self.assertEqual(result.status, "ok")
         custom_fetch.assert_called_once_with("https://a.test", max_chars=12_000)
 

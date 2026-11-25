@@ -9,7 +9,7 @@ from .. import tool_api
 from ..tool_api import VendorCall, VendorSpec, hit, page
 
 
-def search(spec: VendorSpec, query: str, max_results: int, search_context_size: str | None) -> VendorCall:
+def search(spec: VendorSpec, query: str, max_results: int) -> VendorCall:
     return tool_api.request(
         method="GET", url="https://api.search.tinyfish.ai",
         headers={"X-API-Key": os.environ["TINYFISH_API_KEY"], "Accept": "application/json"},

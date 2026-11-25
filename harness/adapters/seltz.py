@@ -9,7 +9,7 @@ from .. import tool_api
 from ..tool_api import VendorCall, VendorSpec, hit
 
 
-def search(spec: VendorSpec, query: str, max_results: int, search_context_size: str | None) -> VendorCall:
+def search(spec: VendorSpec, query: str, max_results: int) -> VendorCall:
     return tool_api.request(
         method="POST", url="https://api.seltz.ai/v1/search",
         headers={"x-api-key": os.environ["SELTZ_API_KEY"], "Content-Type": "application/json"},

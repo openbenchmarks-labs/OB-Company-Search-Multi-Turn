@@ -1,4 +1,5 @@
 tool: exa
+# site: filters in a query move into includeDomains.
 setups:
   exa_deep:
     provider_slug: exa-deep
@@ -12,6 +13,7 @@ setups:
     request_config:
       type: deep
       contents: {highlights: true}
+      site_operator_policy: include_domains
     pricing:
       search_usd: 0.012
       fetch_usd: 0.001
@@ -27,6 +29,7 @@ setups:
     request_config:
       type: instant
       contents: {highlights: true}
+      site_operator_policy: include_domains
     pricing:
       search_usd: 0.007
       fetch_usd: 0.001

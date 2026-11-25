@@ -3,43 +3,18 @@
 from __future__ import annotations
 
 import os
-import re
 from typing import Any
 
 from .. import tool_api
-from ..tool_api import VendorCall, VendorSpec, hit, page
-
-_SITE_INCLUDE_RE = re.compile(r"(?<![-])site:([^\s]+)", re.I)
+from ..tool_api import VendorCall, VendorSpec, hit, page, site_scoped
 
 
-def parallel_site_policy(query: str) -> tuple[str, list[str]]:
-    """Move positive site: filters to Parallel's include_domains policy."""
-    domains: list[str] = []
-    seen: set[str] = set()
-
-    def take(match: re.Match[str]) -> str:
-        raw = match.group(1).strip("\"'").rstrip("/")
-        raw = re.sub(r"^https?://", "", raw, flags=re.I).removeprefix("www.")
-        host = raw.split("/", 1)[0].strip(".").lower()
-        if host and host not in seen:
-            seen.add(host)
-            domains.append(host)
-        return " "
-
-    cleaned = re.sub(r"\s+", " ", _SITE_INCLUDE_RE.sub(take, query)).strip()
-    return cleaned, domains
-
-
-def search(spec: VendorSpec, query: str, max_results: int, search_context_size: str | None) -> VendorCall:
+def search(spec: VendorSpec, query: str, max_results: int) -> VendorCall:
     mode = str(spec.request_config["mode"])
-    sent_query = query
+    sent_query, include_domains = site_scoped(spec, query)
     advanced_settings: dict[str, Any] = {"max_results": max_results}
-    if spec.request_config.get("site_operator_policy") == "source_policy":
-        sent_query, include_domains = parallel_site_policy(query)
-        if not sent_query:
-            sent_query = " ".join(include_domains) or query
-        if include_domains:
-            advanced_settings["source_policy"] = {"include_domains": include_domains}
+    if include_domains:
+        advanced_settings["source_policy"] = {"include_domains": include_domains}
     return tool_api.request(
         method="POST", url="https://api.parallel.ai/v1/search",
         headers={"x-api-key": os.environ["PARALLEL_API_KEY"], "Content-Type": "application/json"},

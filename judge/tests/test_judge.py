@@ -70,6 +70,25 @@ class JudgeTest(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "trial indexes"):
             build_leaderboard([_artifact(1, correct=True)], expected_trials=3)
 
+    def test_a_run_without_a_price_leaves_the_tool_cost_unknown(self) -> None:
+        artifacts = [_artifact(trial, correct=True) for trial in (1, 2, 3)]
+        artifacts[2]["result"]["fetches"] = [{"call": {"cost_usd": None}}]
+        row = build_leaderboard(artifacts)["boards"]["search_only"][0]
+        self.assertIsNone(row["mean_cost_usd"])
+        self.assertEqual(row["unpriced_run_count"], 1)
+
+    def test_the_tool_that_stopped_early_is_named(self) -> None:
+        artifacts = []
+        for vendor, cases in (("brave", ("q-1",)), ("serp", ("q-1", "q-2"))):
+            for case_key in cases:
+                for trial in (1, 2, 3):
+                    artifact = _artifact(trial, correct=True)
+                    artifact["vendor_key"] = vendor
+                    artifact["case"]["case_key"] = case_key
+                    artifacts.append(artifact)
+        with self.assertRaisesRegex(ValueError, r"^search_only/brave is missing 1 of 2 questions$"):
+            build_leaderboard(artifacts)
+
 
 if __name__ == "__main__":
     unittest.main()

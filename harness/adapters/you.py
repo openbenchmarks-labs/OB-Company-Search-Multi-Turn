@@ -1,4 +1,4 @@
-"""You.com: search with highlights, and the contents endpoint as the page fetch."""
+"""You.com: search with highlights (and licensed knowledge answers when the setup asks), and the contents endpoint as the page fetch."""
 
 from __future__ import annotations
 
@@ -9,7 +9,7 @@ from .. import tool_api
 from ..tool_api import VendorCall, VendorSpec, hit, page
 
 
-def search(spec: VendorSpec, query: str, max_results: int, search_context_size: str | None) -> VendorCall:
+def search(spec: VendorSpec, query: str, max_results: int) -> VendorCall:
     return tool_api.request(
         method="POST", url="https://ydc-index.io/v1/search",
         headers={"X-API-Key": os.environ["YOU_API_KEY"], "Content-Type": "application/json"},
@@ -25,6 +25,20 @@ def parse_hits(payload: dict[str, Any], max_results: int) -> list[dict[str, Any]
         snippet = "\n".join(value for value in snippets if isinstance(value, str))
         hits.append(hit(item.get("url"), item.get("title"), snippet or item.get("description"), {"page_age": item.get("page_age")}))
     return hits
+
+
+def parse_knowledge(payload: dict[str, Any], max_results: int) -> list[dict[str, Any]]:
+    """Answers from You's licensed sources (knowledge: core); they carry provider credits, not URLs."""
+    return [
+        {
+            "title": str(item.get("title") or ""),
+            "answer": str(item.get("description") or "")[:4000],
+            "as_of": item.get("as_of"),
+            "providers": [str(a.get("name") or "") for a in item.get("attribution") or [] if isinstance(a, dict)],
+        }
+        for item in (payload.get("results") or {}).get("knowledge") or []
+        if isinstance(item, dict) and item.get("type") == "answer" and item.get("description")
+    ][:max_results]
 
 
 def fetch(spec: VendorSpec, url: str, objective: str, max_chars: int) -> VendorCall:

@@ -1,4 +1,5 @@
 tool: linkup
+# site: filters in a query move into includeDomains.
 setups:
   linkup_fast:
     provider_slug: linkup-fast
@@ -9,7 +10,7 @@ setups:
     native_fetch: true
     fetch_endpoint: POST /v1/fetch
     fetch_kind: linkup_fetch
-    request_config: {depth: fast, outputType: searchResults}
+    request_config: {depth: fast, outputType: searchResults, site_operator_policy: include_domains}
     pricing:
       search_usd: 0.005
       fetch_usd: 0.001
@@ -22,7 +23,7 @@ setups:
     native_fetch: true
     fetch_endpoint: POST /v1/fetch
     fetch_kind: linkup_fetch
-    request_config: {depth: standard, outputType: searchResults}
+    request_config: {depth: standard, outputType: searchResults, site_operator_policy: include_domains}
     pricing:
       search_usd: 0.005
       fetch_usd: 0.001

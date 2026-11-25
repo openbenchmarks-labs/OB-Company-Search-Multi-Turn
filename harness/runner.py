@@ -16,7 +16,6 @@ from .model_client import OPENAI_REQUIRED_ENV
 from .search_tools import (
     VENDORS,
     capability_inventory,
-    public_dict,
     required_env,
     validate_vendor_keys,
 )
@@ -173,7 +172,7 @@ def _run_trial(
         },
         "research_mode": config.research_mode,
         "vendor_key": vendor_key,
-        "vendor": public_dict(VENDORS[vendor_key]),
+        "vendor": VENDORS[vendor_key].public_dict(),
         "case": {
             "case_key": case["case_key"],
             "question": case["question"],
@@ -190,16 +189,21 @@ def _run_trial(
     temporary = path.with_suffix(".json.tmp")
     temporary.write_text(json.dumps(artifact, indent=2, ensure_ascii=False) + "\n")
     temporary.replace(path)
-    return {"status": result.status, "path": str(path), "parse_error": parse_error}
+    return {"status": result.status, "path": str(path), "parse_error": parse_error, "account_error": result.account_error}
 
 
 def execute(config: RunnerConfig, client: Any) -> dict[str, Any]:
-    """Execute configured paid calls and persist only local JSON artifacts."""
+    """Execute configured paid calls and persist only local JSON artifacts.
+
+    A tool keeps running through failed questions, which are saved and score zero. It stops only when a call
+    shows its key refused or its account out of credit, since every later call would fail too while the model
+    keeps costing money; the tool is then reported incomplete with the reason."""
     config.validate()
     dataset, cases = _selected_cases(config)
 
     def run_vendor(vendor_key: str) -> dict[str, Any]:
         results: list[dict[str, Any]] = []
+        stopped: str | None = None
         for case in cases:
             with ThreadPoolExecutor(
                 max_workers=min(config.trial_concurrency, config.trial_count)
@@ -218,9 +222,10 @@ def execute(config: RunnerConfig, client: Any) -> dict[str, Any]:
                 ]
                 question_results = [future.result() for future in as_completed(futures)]
             results.extend(question_results)
-            if question_results and all(row["status"] == "error" for row in question_results):
+            if any(row.get("account_error") for row in question_results):
+                stopped = f"account error on {case['case_key']}: key refused or out of credit"
                 break
-        return {"vendor": vendor_key, "results": results}
+        return {"vendor": vendor_key, "results": results, "complete": stopped is None, "stopped": stopped}
 
     with ThreadPoolExecutor(
         max_workers=min(config.vendor_concurrency, len(config.vendor_keys))

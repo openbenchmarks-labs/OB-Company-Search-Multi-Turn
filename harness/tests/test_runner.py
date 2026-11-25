@@ -12,7 +12,7 @@ from harness.runner import RunnerConfig, execute, runner_plan
 from harness.tool_api import VendorCall
 
 
-def _dataset(path: Path) -> dict:
+def _dataset(path: Path, case_count: int = 1) -> dict:
     payload = {
         "schema_version": SCHEMA_VERSION,
         "dataset": {"slug": "test-dataset", "name": "Test dataset"},
@@ -20,17 +20,18 @@ def _dataset(path: Path) -> dict:
         "gold_release": {"version": 1, "source": "generated"},
         "cases": [
             {
-                "case_key": "q-1",
-                "question": "Find companies founded after 2020",
+                "case_key": f"q-{number}",
+                "question": f"Find companies founded after 202{number}",
                 "family": "other",
                 "constraint_count": 1,
-                "constraints": ["founded after 2020"],
+                "constraints": [f"founded after 202{number}"],
                 "predicates": {},
-                "sort_order": 1,
+                "sort_order": number,
                 "gold": [
                     {"entity_key": entity_key("Acme"), "name": "Acme", "domain": "acme.example", "aliases": []},
                 ],
             }
+            for number in range(1, case_count + 1)
         ],
     }
     payload["content_sha256"] = content_sha256(payload)
@@ -111,32 +112,55 @@ class RunnerTest(unittest.TestCase):
                     )
                 )
 
-    def test_perplexity_context_size_follows_research_mode(self) -> None:
-        tool_call = [{
+    def test_no_search_setup_answers_without_tools(self) -> None:
+        client = FakeClient([FakeResponse({"companies": []})])
+        result = run_agent("Find companies", vendor_key="no_search", client=client, config=AgentConfig())
+        self.assertEqual(result.status, "ok")
+        self.assertNotIn("tools", client.responses.requests[0])
+
+    def test_account_error_stops_a_tool_but_an_outage_does_not(self) -> None:
+        failures = {"brave": (402, "HTTP 402: out of credit"), "serp": (503, "HTTP 503: unavailable")}
+
+        def failing_search(vendor_key, query, *, max_results):
+            status, error = failures[vendor_key]
+            return VendorCall("error", 1, {}, {}, error, [{"attempt": 1, "status_code": status}], 0.0, hits=[])
+
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            dataset = root / "dataset.json"
+            _dataset(dataset, case_count=2)
+            config = RunnerConfig(
+                dataset_path=dataset,
+                output_dir=root / "runs",
+                vendor_keys=("brave", "serp"),
+                trial_count=1,
+                research_mode="search_only",
+                agent=AgentConfig(max_fetches=0, max_fetches_per_turn=None),
+            )
+            with patch("harness.agent.search", side_effect=failing_search):
+                summary = execute(config, SearchThenAnswerClient())
+            ran = {vendor: len(list((root / "runs").rglob(f"search_only/{vendor}/*/trial-*.json"))) for vendor in failures}
+        self.assertEqual(ran, {"brave": 1, "serp": 2})
+        by_vendor = {row["vendor"]: row for row in summary["vendors"]}
+        self.assertFalse(by_vendor["brave"]["complete"])
+        self.assertIn("q-1", by_vendor["brave"]["stopped"])
+        self.assertTrue(by_vendor["serp"]["complete"])
+
+
+class SearchThenAnswerClient:
+    """Searches once, then answers after it sees the search result; safe to share across threads."""
+
+    def __init__(self) -> None:
+        self.responses = self
+
+    def create(self, **request: object) -> FakeResponse:
+        searched = any(isinstance(item, dict) and item.get("type") == "function_call_output" for item in request["input"])
+        if searched:
+            return FakeResponse({"companies": []})
+        return FakeResponse({}, [{
             "type": "function_call", "name": "web_search", "call_id": "call-1",
-            "arguments": json.dumps({"query": "focused company query"}),
-        }]
-        vendor_call = VendorCall("ok", 5, {}, {}, None, [], 0.005, hits=[])
-        for config, expected in (
-            (AgentConfig(), "high"),
-            (AgentConfig(max_fetches=0, max_fetches_per_turn=None), "low"),
-        ):
-            with self.subTest(context_size=expected):
-                client = FakeClient([FakeResponse({}, tool_call), FakeResponse({"companies": []})])
-                with patch("harness.agent.search", return_value=vendor_call) as search_mock:
-                    result = run_agent(
-                        "Find companies",
-                        vendor_key="perplexity",
-                        client=client,
-                        config=config,
-                    )
-                self.assertEqual(result.status, "ok")
-                search_mock.assert_called_once_with(
-                    "perplexity",
-                    "focused company query",
-                    max_results=10,
-                    search_context_size=expected,
-                )
+            "arguments": json.dumps({"query": "company query"}),
+        }])
 
 
 class FakeUsage:

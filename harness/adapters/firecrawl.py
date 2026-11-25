@@ -9,7 +9,7 @@ from .. import tool_api
 from ..tool_api import VendorCall, VendorSpec, hit, page
 
 
-def search(spec: VendorSpec, query: str, max_results: int, search_context_size: str | None) -> VendorCall:
+def search(spec: VendorSpec, query: str, max_results: int) -> VendorCall:
     return tool_api.request(
         method="POST", url="https://api.firecrawl.dev/v2/search",
         headers={"Authorization": f"Bearer {os.environ['FIRECRAWL_API_KEY']}", "Content-Type": "application/json"},

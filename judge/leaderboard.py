@@ -123,7 +123,7 @@ def _assert_complete(
     grouped: dict[tuple[str, str], list[dict[str, Any]]], expected_trials: int
 ) -> None:
     expected_indexes = set(range(1, expected_trials + 1))
-    cases_by_mode: dict[str, set[str]] = {}
+    cases: dict[tuple[str, str], set[str]] = {}
     for (mode, vendor), rows in grouped.items():
         indexes = {row["trial_index"] for row in rows}
         if indexes != expected_indexes:
@@ -141,9 +141,16 @@ def _assert_complete(
         identities = [(row["trial_index"], row["case_key"]) for row in rows]
         if len(identities) != len(set(identities)):
             raise ValueError(f"{mode}/{vendor} contains duplicate trial/case artifacts")
-        if mode in cases_by_mode and cases_by_mode[mode] != first:
-            raise ValueError(f"{mode}/{vendor} does not cover the same cases as other vendors")
-        cases_by_mode.setdefault(mode, first)
+        cases[(mode, vendor)] = first
+    for mode in sorted({mode for mode, _ in cases}):
+        every_case = set().union(*(found for (m, _), found in cases.items() if m == mode))
+        short = sorted(
+            f"{mode}/{vendor} is missing {len(every_case - found)} of {len(every_case)} questions"
+            for (m, vendor), found in cases.items()
+            if m == mode and found != every_case
+        )
+        if short:
+            raise ValueError("; ".join(short))
 
 
 def build_leaderboard(
@@ -179,7 +186,8 @@ def build_leaderboard(
             ]
             for metric in QUALITY_METRICS
         }
-        costs = [float(row["cost_usd"]) for row in rows if row["cost_usd"] is not None]
+        costs = [row["cost_usd"] for row in rows]
+        unpriced = sum(cost is None for cost in costs)
         latencies = sorted(row["latency_ms"] for row in rows)
         p95_index = max(0, int(0.95 * len(latencies) + 0.999999) - 1)
         boards[mode].append(
@@ -194,7 +202,8 @@ def build_leaderboard(
                 "mean_latency_ms": round(statistics.fmean(latencies)),
                 "p95_latency_ms": latencies[p95_index],
                 "mean_model_turn_count": round(_mean(rows, "model_turn_count"), 2),
-                "mean_cost_usd": round(statistics.fmean(costs), 6) if costs else None,
+                "mean_cost_usd": None if unpriced else round(statistics.fmean(costs), 6),
+                "unpriced_run_count": unpriced,
             }
         )
 

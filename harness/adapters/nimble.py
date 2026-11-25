@@ -2,23 +2,26 @@
 
 from __future__ import annotations
 
-import math
 import os
 from typing import Any
 
 from .. import tool_api
-from ..tool_api import VendorCall, VendorSpec, hit
+from ..tool_api import VendorCall, VendorSpec, hit, site_scoped
 
 SEARCH_URL = "https://sdk.nimbleway.com/v2/search"
 EXTRACT_URL = "https://sdk.nimbleway.com/v2/extract"
 
 
-def search(spec: VendorSpec, query: str, max_results: int, search_context_size: str | None) -> VendorCall:
+def search(spec: VendorSpec, query: str, max_results: int) -> VendorCall:
+    sent_query, include_domains = site_scoped(spec, query)
+    body: dict[str, Any] = {"query": sent_query, "search_depth": spec.request_config["search_depth"], "full_content": False,
+                            "focus": "general", "max_results": max_results}
+    if include_domains:
+        body["include_domains"] = include_domains
     return tool_api.request(
         method="POST", url=SEARCH_URL,
         headers={"Authorization": f"Bearer {os.environ['NIMBLE_API_KEY']}", "Content-Type": "application/json"},
-        body={"query": query, "search_depth": spec.request_config["search_depth"], "full_content": False,
-              "focus": "general", "max_results": max_results},
+        body=body,
     )
 
 
@@ -40,7 +43,6 @@ def parse_hits(payload: dict[str, Any], max_results: int) -> list[dict[str, Any]
 
 
 def fetch(spec: VendorSpec, url: str, objective: str, max_chars: int) -> VendorCall:
-    fetch_unit_cost()  # Validate an optional rate before issuing the call.
     return tool_api.request(
         method="POST", url=EXTRACT_URL,
         headers={"Authorization": f"Bearer {os.environ['NIMBLE_API_KEY']}", "Content-Type": "application/json"},
@@ -62,14 +64,3 @@ def read_page(spec: VendorSpec, url: str, payload: Any, max_chars: int) -> dict[
     return {"requested_url": url, "final_url": payload.get("url") or url,
             "title": "", "text": text[:max_chars], "truncated": len(text) > max_chars,
             "fetch_provider": "nimble_extract"}
-
-
-def fetch_unit_cost() -> float | None:
-    """Extract has no list price; your own rate comes from the environment, unset means unknown."""
-    raw = os.getenv("NIMBLE_EXTRACT_USD_PER_REQUEST", "").strip()
-    if not raw:
-        return None
-    value = float(raw)
-    if not math.isfinite(value) or value < 0:
-        raise ValueError("NIMBLE_EXTRACT_USD_PER_REQUEST must be finite and nonnegative")
-    return value
