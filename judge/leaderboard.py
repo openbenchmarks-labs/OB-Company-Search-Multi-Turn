@@ -78,6 +78,7 @@ def score_artifact(artifact: dict[str, Any]) -> dict[str, Any]:
         "case_key": artifact["case"]["case_key"],
         "trial_index": int(artifact["trial_index"]),
         "status": result.get("status"),
+        "stop_reason": result.get("stop_reason"),
         "true_positive": true_positive,
         "false_positive": false_positive,
         "false_negative": false_negative,
@@ -176,6 +177,9 @@ def build_leaderboard(
     if not grouped:
         raise ValueError("no artifacts supplied")
     _assert_complete(grouped, expected_trials)
+    stopped = sorted({f"{row['research_mode']}/{row['vendor_key']}" for row in scored if row["stop_reason"]})
+    if stopped:
+        raise ValueError(f"{', '.join(stopped)} stopped early (tool account or model failure); resume the run first")
 
     boards: dict[str, list[dict[str, Any]]] = defaultdict(list)
     for (mode, vendor_key), rows in grouped.items():
@@ -197,6 +201,7 @@ def build_leaderboard(
                 "question_count": len({row["case_key"] for row in rows}),
                 "trial_count": expected_trials,
                 "agent_run_count": len(rows),
+                "error_run_count": sum(row["status"] != "ok" for row in rows),
                 **{metric: _percent_summary(values) for metric, values in trial_values.items()},
                 "cited_return_rate_pct": round(_mean(rows, "cited_return_rate") * 100, 2),
                 "mean_latency_ms": round(statistics.fmean(latencies)),

@@ -107,7 +107,7 @@ def main() -> int:
     client = build_openai_client()
     result = execute(config, client)
     print(json.dumps(result, indent=2))
-    return 0
+    return 0 if all(row["complete"] for row in result["vendors"]) else 3
 
 
 if __name__ == "__main__":

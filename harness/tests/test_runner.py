@@ -118,8 +118,12 @@ class RunnerTest(unittest.TestCase):
         self.assertEqual(result.status, "ok")
         self.assertNotIn("tools", client.responses.requests[0])
 
-    def test_account_error_stops_a_tool_but_an_outage_does_not(self) -> None:
-        failures = {"brave": (402, "HTTP 402: out of credit"), "serp": (503, "HTTP 503: unavailable")}
+    def test_credit_errors_stop_a_tool_but_an_outage_does_not(self) -> None:
+        failures = {
+            "brave": (402, "HTTP 402: out of credit"),
+            "tavily_basic": (432, "HTTP 432: plan limit exceeded"),
+            "serp": (503, "HTTP 503: unavailable"),
+        }
 
         def failing_search(vendor_key, query, *, max_results):
             status, error = failures[vendor_key]
@@ -127,24 +131,46 @@ class RunnerTest(unittest.TestCase):
 
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary)
-            dataset = root / "dataset.json"
-            _dataset(dataset, case_count=2)
-            config = RunnerConfig(
-                dataset_path=dataset,
-                output_dir=root / "runs",
-                vendor_keys=("brave", "serp"),
-                trial_count=1,
-                research_mode="search_only",
-                agent=AgentConfig(max_fetches=0, max_fetches_per_turn=None),
-            )
+            config = _two_question_config(root, tuple(failures))
             with patch("harness.agent.search", side_effect=failing_search):
                 summary = execute(config, SearchThenAnswerClient())
             ran = {vendor: len(list((root / "runs").rglob(f"search_only/{vendor}/*/trial-*.json"))) for vendor in failures}
-        self.assertEqual(ran, {"brave": 1, "serp": 2})
+        self.assertEqual(ran, {"brave": 1, "tavily_basic": 1, "serp": 2})
         by_vendor = {row["vendor"]: row for row in summary["vendors"]}
-        self.assertFalse(by_vendor["brave"]["complete"])
+        self.assertEqual([by_vendor[v]["complete"] for v in failures], [False, False, True])
         self.assertIn("q-1", by_vendor["brave"]["stopped"])
-        self.assertTrue(by_vendor["serp"]["complete"])
+
+    def test_a_model_failure_stops_the_tool_and_the_resumed_run_retries_it(self) -> None:
+        class DeadModel:
+            def __init__(self) -> None:
+                self.responses = self
+
+            def create(self, **request: object) -> None:
+                raise ConnectionError("model provider unreachable")
+
+        found = VendorCall("ok", 1, {}, {}, None, [{"attempt": 1, "status_code": 200}], 0.005, hits=[])
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            config = _two_question_config(root, ("brave",))
+            first = execute(config, DeadModel())
+            with patch("harness.agent.search", return_value=found):
+                second = execute(config, SearchThenAnswerClient())
+            statuses = sorted(json.loads(path.read_text())["result"]["status"] for path in (root / "runs").rglob("trial-*.json"))
+        self.assertEqual((first["vendors"][0]["complete"], second["vendors"][0]["complete"]), (False, True))
+        self.assertEqual(statuses, ["ok", "ok"])
+
+
+def _two_question_config(root: Path, vendors: tuple[str, ...]) -> RunnerConfig:
+    dataset = root / "dataset.json"
+    _dataset(dataset, case_count=2)
+    return RunnerConfig(
+        dataset_path=dataset,
+        output_dir=root / "runs",
+        vendor_keys=vendors,
+        trial_count=1,
+        research_mode="search_only",
+        agent=AgentConfig(max_fetches=0, max_fetches_per_turn=None),
+    )
 
 
 class SearchThenAnswerClient:

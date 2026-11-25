@@ -3,7 +3,7 @@
 Runs the benchmark and calls the search APIs. No grading code lives here.
 
 - `run.py` — Command-line runner. Prints the run plan, and runs it only with `--execute --confirm-paid`.
-- `runner.py` — Runs every question for every tool and trial, and saves one result file per run under `runs/`. A failed question is saved and scores zero; a tool stops early only when its key is refused or its account is out of credit (HTTP 401 or 402), and the run reports it incomplete.
+- `runner.py` — Runs every question for every tool and trial, and saves one result file per run under `runs/`. A failed question is saved and scores zero. A tool stops early when a failure would repeat on every later trial: its key refused or its account out of credit (HTTP 401, 402, or Tavily's 432 and 433), or the model call failing. The run then reports the tool incomplete and exits with status 3, the board refuses to build, and running the same command again retries the stopped trials.
 - `agent.py` — The research agent loop: the model searches, reads pages, and returns a list of companies.
 - `model_client.py` — Builds the OpenAI client from `OPENAI_API_KEY`.
 - `search_tools.py` — Loads every tool from `tools/*.yaml` and sends each search or page fetch to that tool's adapter.

@@ -101,8 +101,18 @@ COMPANY_SET_SCHEMA = {
 }
 
 
-class VendorAccountError(RuntimeError):
-    """The tool refused the key or the account ran out of credit; later calls would fail the same way."""
+class StopTool(RuntimeError):
+    """A failure every later trial would repeat: the runner stops the tool, and a resumed run retries the trial."""
+
+    reason = ""
+
+
+class VendorAccountError(StopTool):
+    reason = "tool key refused or out of credit"
+
+
+class ModelCallError(StopTool):
+    reason = "model call failed"
 
 
 @dataclass(frozen=True)
@@ -182,7 +192,7 @@ class AgentResult:
     cache_write_input_tokens: int = 0
     output_tokens: int = 0
     model_cost_usd: float | None = None
-    account_error: bool = False
+    stop_reason: str | None = None
 
     def raw_model_payload(self) -> dict[str, Any]:
         return {
@@ -358,7 +368,10 @@ def run_agent(
             }
             if tools and not final_turn:
                 request["tools"] = tools
-            response = client.responses.create(**request)
+            try:
+                response = client.responses.create(**request)
+            except Exception as exc:  # noqa: BLE001 - our side, never the tool's miss
+                raise ModelCallError(f"{type(exc).__name__}: {exc}") from exc
             result.model_responses.append(_response_dict(response))
             input_tokens, cached_input_tokens, cache_write_input_tokens, output_tokens = _usage(response)
             result.input_tokens += input_tokens
@@ -441,7 +454,7 @@ def run_agent(
     except Exception as exc:  # noqa: BLE001
         result.status = "error"
         result.error = f"{type(exc).__name__}: {exc}"
-        result.account_error = isinstance(exc, VendorAccountError)
+        result.stop_reason = exc.reason if isinstance(exc, StopTool) else None
     result.latency_ms = round((time.perf_counter() - started) * 1000)
     try:
         result.model_cost_usd = _model_cost(
@@ -480,5 +493,5 @@ def result_manifest(result: AgentResult) -> dict[str, Any]:
         ],
         "raw_model_response": result.raw_model_payload(),
         "model_cost_usd": result.model_cost_usd,
-        "vendor_account_error": result.account_error,
+        "stop_reason": result.stop_reason,
     }

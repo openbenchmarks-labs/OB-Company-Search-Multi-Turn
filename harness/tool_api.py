@@ -19,9 +19,10 @@ import yaml
 TOOLS_DIR = Path(__file__).resolve().parents[1] / "tools"
 REDACTED = "***REDACTED***"
 RETRYABLE_STATUS = {429, 500, 502, 503, 504}
-# The key is refused or the account is out of credit: every later call to the tool fails the same way.
-ACCOUNT_STATUS = {401, 402}
-_SITE_INCLUDE_RE = re.compile(r"(?<![-])site:([^\s]+)", re.I)
+# The key is refused or the account is out of credit (Tavily: 432 plan limit, 433 pay-as-you-go limit):
+# every later call to the tool fails the same way.
+ACCOUNT_STATUS = {401, 402, 432, 433}
+_SITE_INCLUDE_RE = re.compile(r"(?<![-\w])site:([^\s]+)", re.I)
 
 
 @dataclass(frozen=True)

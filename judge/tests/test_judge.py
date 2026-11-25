@@ -89,6 +89,12 @@ class JudgeTest(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, r"^search_only/brave is missing 1 of 2 questions$"):
             build_leaderboard(artifacts)
 
+    def test_a_board_with_stopped_trials_is_refused(self) -> None:
+        artifacts = [_artifact(trial, correct=True) for trial in (1, 2, 3)]
+        artifacts[1]["result"].update(status="error", stop_reason="model call failed")
+        with self.assertRaisesRegex(ValueError, "search_only/brave stopped early"):
+            build_leaderboard(artifacts)
+
 
 if __name__ == "__main__":
     unittest.main()

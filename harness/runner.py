@@ -130,8 +130,11 @@ def _existing_is_complete(path: Path, retry_errors: bool) -> bool:
     if not path.is_file():
         return False
     try:
-        status = json.loads(path.read_text())["result"]["status"]
+        result = json.loads(path.read_text())["result"]
+        status = result["status"]
     except (OSError, KeyError, TypeError, json.JSONDecodeError):
+        return False
+    if result.get("stop_reason"):
         return False
     return status == "ok" or (status == "error" and not retry_errors)
 
@@ -189,15 +192,16 @@ def _run_trial(
     temporary = path.with_suffix(".json.tmp")
     temporary.write_text(json.dumps(artifact, indent=2, ensure_ascii=False) + "\n")
     temporary.replace(path)
-    return {"status": result.status, "path": str(path), "parse_error": parse_error, "account_error": result.account_error}
+    return {"status": result.status, "path": str(path), "parse_error": parse_error, "stop_reason": result.stop_reason}
 
 
 def execute(config: RunnerConfig, client: Any) -> dict[str, Any]:
     """Execute configured paid calls and persist only local JSON artifacts.
 
-    A tool keeps running through failed questions, which are saved and score zero. It stops only when a call
-    shows its key refused or its account out of credit, since every later call would fail too while the model
-    keeps costing money; the tool is then reported incomplete with the reason."""
+    A tool keeps running through failed questions, which are saved and score zero. It stops when a failure
+    would repeat on every later trial: its key refused or its account out of credit, or the model call
+    failing (our side, never the tool's miss). The tool is then reported incomplete with the reason, the
+    board refuses to build, and a resumed run retries the stopped trials."""
     config.validate()
     dataset, cases = _selected_cases(config)
 
@@ -222,8 +226,9 @@ def execute(config: RunnerConfig, client: Any) -> dict[str, Any]:
                 ]
                 question_results = [future.result() for future in as_completed(futures)]
             results.extend(question_results)
-            if any(row.get("account_error") for row in question_results):
-                stopped = f"account error on {case['case_key']}: key refused or out of credit"
+            reasons = sorted({row["stop_reason"] for row in question_results if row.get("stop_reason")})
+            if reasons:
+                stopped = f"stopped on {case['case_key']}: {', '.join(reasons)}"
                 break
         return {"vendor": vendor_key, "results": results, "complete": stopped is None, "stopped": stopped}
 

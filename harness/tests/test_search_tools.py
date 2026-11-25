@@ -27,6 +27,7 @@ class SearchToolsTest(unittest.TestCase):
             split_site_filters(query),
             ("funding -site:reddit.com", ["crunchbase.com", "techcrunch.com"]),
         )
+        self.assertEqual(split_site_filters("best website:builder startups"), ("best website:builder startups", []))
         for key, mode in (
             ("parallel_basic", "basic"),
             ("parallel_advanced", "advanced"),
@@ -162,6 +163,9 @@ class SearchToolsTest(unittest.TestCase):
             ("linkup_standard", "LINKUP_API_KEY", "q", "includeDomains"),
             ("nimble_lite", "NIMBLE_API_KEY", "query", "include_domains"),
             ("nimble_standard", "NIMBLE_API_KEY", "query", "include_domains"),
+            ("you_highlights", "YOU_API_KEY", "query", "include_domains"),
+            ("you_highlights_core", "YOU_API_KEY", "query", "include_domains"),
+            ("perplexity", "PERPLEXITY_API_KEY", "query", "search_domain_filter"),
         ):
             with self.subTest(vendor=vendor):
                 with (
@@ -172,6 +176,7 @@ class SearchToolsTest(unittest.TestCase):
                 body = request.call_args.kwargs["body"]
                 self.assertEqual(body[query_key], "seed rounds")
                 self.assertEqual(body[domains_key], ["crunchbase.com"])
+                self.assertNotIn("site_operator_policy", body)
 
     def test_both_tavily_setups_read_pages_with_advanced_extract(self) -> None:
         page_call = VendorCall("ok", 1, {}, {"results": [{"url": "https://a.test", "raw_content": "one"}]}, None, [], None)

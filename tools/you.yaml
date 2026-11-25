@@ -1,4 +1,5 @@
 tool: you
+# site: filters in a query move into include_domains.
 setups:
   you_highlights:
     provider_slug: you-highlights
@@ -12,6 +13,7 @@ setups:
     request_config:
       count: 10
       extraction: {extraction_mode: highlights}
+      site_operator_policy: include_domains
     pricing:
       search_usd: 0.005
       fetch_usd: 0.001
@@ -28,6 +30,7 @@ setups:
       count: 10
       extraction: {extraction_mode: highlights}
       knowledge: core
+      site_operator_policy: include_domains
     pricing:
       search_usd: 0.005
       fetch_usd: 0.001
