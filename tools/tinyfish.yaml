@@ -1,6 +1,6 @@
 tool: tinyfish
-# Search and fetch are free on every plan (tinyfish.ai/pricing, read 25 Nov 2026). TinyFish calls site: in the
-# query deprecated for domain filtering and asks for include_domains, so site: filters move there.
+# Search and fetch are free on every plan (tinyfish.ai/pricing, read 25 Nov 2026). site: filters stay in the query
+# as the agent wrote it, as on the board's runs.
 setups:
   tinyfish:
     provider_slug: tinyfish-search
@@ -11,7 +11,7 @@ setups:
     native_fetch: true
     fetch_endpoint: POST api.fetch.tinyfish.ai
     fetch_kind: tinyfish_fetch
-    request_config: {site_operator_policy: include_domains}
+    request_config: {}
     pricing:
       search_usd: 0.0
       fetch_usd: 0.0
