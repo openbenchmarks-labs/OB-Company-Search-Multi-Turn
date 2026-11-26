@@ -6,18 +6,15 @@ import os
 from typing import Any
 
 from .. import tool_api
-from ..tool_api import VendorCall, VendorSpec, hit, site_scoped
+from ..tool_api import VendorCall, VendorSpec, hit
 
 SEARCH_URL = "https://sdk.nimbleway.com/v2/search"
 EXTRACT_URL = "https://sdk.nimbleway.com/v2/extract"
 
 
 def search(spec: VendorSpec, query: str, max_results: int) -> VendorCall:
-    sent_query, include_domains = site_scoped(spec, query)
-    body: dict[str, Any] = {"query": sent_query, "search_depth": spec.request_config["search_depth"], "full_content": False,
-                            "focus": "general", "max_results": max_results}
-    if include_domains:
-        body["include_domains"] = include_domains
+    body = {"query": query, "search_depth": spec.request_config["search_depth"], "full_content": False,
+            "focus": "general", "max_results": max_results}
     return tool_api.request(
         method="POST", url=SEARCH_URL,
         headers={"Authorization": f"Bearer {os.environ['NIMBLE_API_KEY']}", "Content-Type": "application/json"},

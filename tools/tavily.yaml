@@ -1,5 +1,5 @@
 tool: tavily
-# Both setups read pages with advanced extract, as the board's runs did; site: filters move into include_domains.
+# Both setups read pages with advanced extract, as the board's runs did.
 setups:
   tavily_advanced:
     provider_slug: tavily-advanced
@@ -10,7 +10,7 @@ setups:
     native_fetch: true
     fetch_endpoint: POST /extract
     fetch_kind: tavily_extract
-    request_config: {search_depth: advanced, chunks_per_source: 3, extract_depth: advanced, site_operator_policy: include_domains}
+    request_config: {search_depth: advanced, chunks_per_source: 3, extract_depth: advanced}
     pricing:
       search_usd: 0.016
       fetch_usd: 0.0032
@@ -23,7 +23,7 @@ setups:
     native_fetch: true
     fetch_endpoint: POST /extract
     fetch_kind: tavily_extract
-    request_config: {search_depth: basic, extract_depth: advanced, site_operator_policy: include_domains}
+    request_config: {search_depth: basic, extract_depth: advanced}
     pricing:
       search_usd: 0.008
       fetch_usd: 0.0032

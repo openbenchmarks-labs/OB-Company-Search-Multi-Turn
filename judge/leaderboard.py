@@ -211,7 +211,7 @@ def build_leaderboard(
                 "error_run_count": sum(row["status"] != "ok" for row in rows),
                 **{metric: _percent_summary(values) for metric, values in trial_values.items()},
                 "cited_return_rate_pct": round(_mean(rows, "cited_return_rate") * 100, 2),
-                "mean_latency_ms": round(statistics.fmean(latencies)),
+                "median_latency_ms": round(statistics.median(latencies)),
                 "p95_latency_ms": latencies[p95_index],
                 "mean_model_turn_count": round(_mean(rows, "model_turn_count"), 2),
                 "mean_cost_usd": None if unpriced else round(statistics.fmean(costs), 6),

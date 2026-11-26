@@ -6,7 +6,7 @@ Each file lists the tool's setups. A setup names the search endpoint and its set
 
 A setup with `native_fetch: true` reads pages through the tool's own fetch API. A setup with `custom_fetch: true` has no fetch API, so pages come from the shared fetcher in `harness/custom_fetch.py` at no charge.
 
-A setup with `site_operator_policy` moves `site:` filters out of the agent's query into the tool's own domain filter, for the tools whose docs ask for that: Linkup, Nimble, Parallel, Perplexity, Tako, Tavily and TinyFish. Brave, Exa, Firecrawl, Keenable, SERP and You apply `site:` in the query themselves, so it stays as the agent wrote it.
+A setup with `site_operator_policy` moves `site:` filters out of the agent's query into the tool's own domain filter, for Parallel and TinyFish, whose docs ask for that. Every other tool gets `site:` in the query as the agent wrote it.
 
 `none.yaml` is the baseline: the same agent and model with no search and no fetch (`web_search: false`), run beside the tools so the board shows how much each one adds.
 

@@ -84,7 +84,7 @@ class SearchToolsTest(unittest.TestCase):
                 "linkup_standard", "parallel_advanced", "parallel_basic",
                 "parallel_fast", "parallel_turbo", "seltz_companies", "serp",
                 "tavily_advanced", "tavily_basic", "you_highlights", "you_highlights_core", "tinyfish", "perplexity",
-                "tako", "keenable_pro", "keenable_realtime",
+                "keenable_pro", "keenable_realtime",
             },
         )
         capabilities = {row["vendor"]: row for row in capability_inventory()}
@@ -92,7 +92,7 @@ class SearchToolsTest(unittest.TestCase):
             "context", "exa_deep", "exa_instant", "firecrawl", "linkup_fast",
             "linkup_standard", "parallel_advanced", "parallel_basic",
             "parallel_fast", "parallel_turbo", "tavily_advanced", "tavily_basic", "you_highlights", "you_highlights_core", "tinyfish",
-            "perplexity", "tako",
+            "perplexity",
         ):
             self.assertTrue(capabilities[key]["native_fetch"])
         for key in ("brave", "seltz_companies", "serp", "keenable_pro", "keenable_realtime"):
@@ -122,7 +122,6 @@ class SearchToolsTest(unittest.TestCase):
             "you_highlights": {"results": {"web": [{"url": "https://a.test", "title": "A", "snippets": ["one"]}]}},
             "tinyfish": {"results": [{"url": "https://a.test", "title": "A", "snippet": "one"}]},
             "perplexity": {"results": [{"url": "https://a.test", "title": "A", "snippet": "one"}]},
-            "tako": {"web_results": [{"url": "https://a.test", "title": "A", "snippet": "one"}]},
             "keenable_pro": {"results": [{"url": "https://a.test", "title": "A", "snippet": "one"}]},
         }
         fixtures["you_highlights_core"] = fixtures["you_highlights"]
@@ -151,7 +150,6 @@ class SearchToolsTest(unittest.TestCase):
             "you_highlights": ("YOU_API_KEY", "https://ydc-index.io/v1/search", "POST"),
             "tinyfish": ("TINYFISH_API_KEY", "https://api.search.tinyfish.ai", "GET"),
             "perplexity": ("PERPLEXITY_API_KEY", "https://api.perplexity.ai/search", "POST"),
-            "tako": ("TAKO_API_KEY", "https://tako.com/api/v3/search", "POST"),
             "keenable_pro": ("KEENABLE_API_KEY", "https://api.keenable.ai/v1/search", "POST"),
         }
         for vendor, (env_key, endpoint, method) in fixtures.items():
@@ -171,19 +169,19 @@ class SearchToolsTest(unittest.TestCase):
     def test_site_queries_follow_each_tools_documented_rule(self) -> None:
         empty_call = VendorCall("ok", 1, {}, {"results": []}, None, [], None)
         query = "seed rounds site:www.Crunchbase.com/organization"
-        moved = ("seed rounds", ["crunchbase.com"])
+        as_written = (query, None)
         for vendor, env_key, query_key, domains_key, expected in (
-            ("tavily_basic", "TAVILY_API_KEY", "query", "include_domains", moved),
-            ("tavily_advanced", "TAVILY_API_KEY", "query", "include_domains", moved),
-            ("linkup_fast", "LINKUP_API_KEY", "q", "includeDomains", moved),
-            ("linkup_standard", "LINKUP_API_KEY", "q", "includeDomains", moved),
-            ("nimble_lite", "NIMBLE_API_KEY", "query", "include_domains", moved),
-            ("nimble_standard", "NIMBLE_API_KEY", "query", "include_domains", moved),
-            ("perplexity", "PERPLEXITY_API_KEY", "query", "search_domain_filter", moved),
+            ("tavily_basic", "TAVILY_API_KEY", "query", "include_domains", as_written),
+            ("tavily_advanced", "TAVILY_API_KEY", "query", "include_domains", as_written),
+            ("linkup_fast", "LINKUP_API_KEY", "q", "includeDomains", as_written),
+            ("linkup_standard", "LINKUP_API_KEY", "q", "includeDomains", as_written),
+            ("nimble_lite", "NIMBLE_API_KEY", "query", "include_domains", as_written),
+            ("nimble_standard", "NIMBLE_API_KEY", "query", "include_domains", as_written),
+            ("perplexity", "PERPLEXITY_API_KEY", "query", "search_domain_filter", as_written),
             ("tinyfish", "TINYFISH_API_KEY", "query", "include_domains", ("seed rounds", "crunchbase.com")),
-            ("keenable_pro", "KEENABLE_API_KEY", "query", "include_domains", (query, None)),
-            ("exa_deep", "EXA_API_KEY", "query", "includeDomains", (query, None)),
-            ("you_highlights", "YOU_API_KEY", "query", "include_domains", (query, None)),
+            ("keenable_pro", "KEENABLE_API_KEY", "query", "include_domains", as_written),
+            ("exa_deep", "EXA_API_KEY", "query", "includeDomains", as_written),
+            ("you_highlights", "YOU_API_KEY", "query", "include_domains", as_written),
         ):
             with self.subTest(vendor=vendor):
                 with (
@@ -194,18 +192,6 @@ class SearchToolsTest(unittest.TestCase):
                 sent = request.call_args.kwargs.get("body") or request.call_args.kwargs["params"]
                 self.assertEqual((sent[query_key], sent.get(domains_key)), expected)
                 self.assertNotIn("site_operator_policy", sent)
-
-    def test_tako_sends_the_board_request_with_site_hosts_in_include_domains(self) -> None:
-        empty_call = VendorCall("ok", 1, {}, {"web_results": []}, None, [], None)
-        with (
-            patch.dict(os.environ, {"TAKO_API_KEY": "test-key"}),
-            patch("harness.tool_api.request", return_value=empty_call) as request,
-        ):
-            search("tako", "seed rounds site:crunchbase.com", max_results=7)
-        self.assertEqual(request.call_args.kwargs["body"], {
-            "query": "seed rounds", "effort": "fast",
-            "sources": {"web": {"count": 7, "highlights": True, "include_domains": ["crunchbase.com"]}},
-        })
 
     def test_both_tavily_setups_read_pages_with_advanced_extract(self) -> None:
         page_call = VendorCall("ok", 1, {}, {"results": [{"url": "https://a.test", "raw_content": "one"}]}, None, [], None)
@@ -256,7 +242,6 @@ class SearchToolsTest(unittest.TestCase):
                     "text": "one",
                 }],
             },
-            "tako": {"contents": [{"source_url": "https://a.test", "data": "one"}]},
         }
         for vendor, payload in fixtures.items():
             with self.subTest(vendor=vendor):
@@ -269,13 +254,11 @@ class SearchToolsTest(unittest.TestCase):
             "you_highlights": ("YOU_API_KEY", "https://ydc-index.io/v1/contents"),
             "tinyfish": ("TINYFISH_API_KEY", "https://api.fetch.tinyfish.ai"),
             "perplexity": ("PERPLEXITY_API_KEY", "https://api.perplexity.ai/v1/context"),
-            "tako": ("TAKO_API_KEY", "https://tako.com/api/v1/contents"),
         }
         responses = {
             "you_highlights": [{"url": "https://a.test", "markdown": "one"}],
             "tinyfish": {"results": [{"url": "https://a.test", "text": "one"}]},
             "perplexity": {"results": [{"url": "https://a.test", "markdown": "one", "status": {"type": "ok"}}]},
-            "tako": {"contents": [{"source_url": "https://a.test", "data": "one"}]},
         }
         for vendor, (env_key, endpoint) in fixtures.items():
             with self.subTest(vendor=vendor):

@@ -161,6 +161,31 @@ def validate_artifact(payload: dict[str, Any]) -> DatasetSummary:
     )
 
 
+def _read_hugging_face(path: Path) -> dict[str, Any]:
+    """Join a Hugging Face copy back into one dataset: metadata.json plus the question rows in data/*.jsonl."""
+    if path.is_dir():
+        root = path
+        rows_files = sorted((path / "data").glob("*.jsonl"))
+        if len(rows_files) != 1:
+            raise DatasetValidationError(f"{path}/data must hold exactly one .jsonl file, found {len(rows_files)}")
+        rows_file = rows_files[0]
+    else:
+        rows_file = path
+        root = path.parent.parent if path.parent.name == "data" else path.parent
+    metadata_file = root / "metadata.json"
+    if not metadata_file.is_file():
+        raise DatasetValidationError(f"{metadata_file} is missing; it holds the dataset's name and content_sha256")
+    metadata = json.loads(metadata_file.read_text(encoding="utf-8"))
+    if not isinstance(metadata, dict):
+        raise DatasetValidationError(f"{metadata_file} must be an object")
+    lines = rows_file.read_text(encoding="utf-8").splitlines()
+    return {**metadata, "cases": [json.loads(line) for line in lines if line.strip()]}
+
+
 def load_artifact(path: Path) -> tuple[dict[str, Any], DatasetSummary]:
-    payload = json.loads(path.read_text(encoding="utf-8"))
+    """Load a dataset file (.json), or a Hugging Face copy: its folder or its data/*.jsonl file."""
+    if path.is_dir() or path.suffix == ".jsonl":
+        payload = _read_hugging_face(path)
+    else:
+        payload = json.loads(path.read_text(encoding="utf-8"))
     return payload, validate_artifact(payload)
