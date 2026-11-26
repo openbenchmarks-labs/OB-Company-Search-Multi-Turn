@@ -1,6 +1,5 @@
 tool: tinyfish
-# Search and fetch are free on every plan (tinyfish.ai/pricing, read 25 Nov 2026). site: filters stay in the query
-# as the agent wrote it, as on the board's runs.
+# Search and fetch are free on every plan (tinyfish.ai/pricing, read 25 Nov 2026).
 setups:
   tinyfish:
     provider_slug: tinyfish-search
