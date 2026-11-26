@@ -84,7 +84,7 @@ class SearchToolsTest(unittest.TestCase):
                 "linkup_standard", "parallel_advanced", "parallel_basic",
                 "parallel_fast", "parallel_turbo", "seltz_companies", "serp",
                 "tavily_advanced", "tavily_basic", "you_highlights", "you_highlights_core", "tinyfish", "perplexity",
-                "keenable_pro", "keenable_realtime",
+                "keenable_pro", "keenable_realtime", "specstream",
             },
         )
         capabilities = {row["vendor"]: row for row in capability_inventory()}
@@ -92,7 +92,7 @@ class SearchToolsTest(unittest.TestCase):
             "context", "exa_deep", "exa_instant", "firecrawl", "linkup_fast",
             "linkup_standard", "parallel_advanced", "parallel_basic",
             "parallel_fast", "parallel_turbo", "tavily_advanced", "tavily_basic", "you_highlights", "you_highlights_core", "tinyfish",
-            "perplexity",
+            "perplexity", "specstream",
         ):
             self.assertTrue(capabilities[key]["native_fetch"])
         for key in ("brave", "seltz_companies", "serp", "keenable_pro", "keenable_realtime"):
@@ -123,6 +123,7 @@ class SearchToolsTest(unittest.TestCase):
             "tinyfish": {"results": [{"url": "https://a.test", "title": "A", "snippet": "one"}]},
             "perplexity": {"results": [{"url": "https://a.test", "title": "A", "snippet": "one"}]},
             "keenable_pro": {"results": [{"url": "https://a.test", "title": "A", "snippet": "one"}]},
+            "specstream": {"data": {"sources": [{"url": "https://a.test", "title": "A", "snippet": "one"}]}},
         }
         fixtures["you_highlights_core"] = fixtures["you_highlights"]
         fixtures["nimble_lite"] = {"results": [{"url": "https://a.test", "title": "A", "description": "one"}]}
@@ -151,6 +152,7 @@ class SearchToolsTest(unittest.TestCase):
             "tinyfish": ("TINYFISH_API_KEY", "https://api.search.tinyfish.ai", "GET"),
             "perplexity": ("PERPLEXITY_API_KEY", "https://api.perplexity.ai/search", "POST"),
             "keenable_pro": ("KEENABLE_API_KEY", "https://api.keenable.ai/v1/search", "POST"),
+            "specstream": ("SPECSTREAM_API_KEY", "https://api.specstream.ai/v1/web-search", "POST"),
         }
         for vendor, (env_key, endpoint, method) in fixtures.items():
             with self.subTest(vendor=vendor):
@@ -180,6 +182,7 @@ class SearchToolsTest(unittest.TestCase):
             ("perplexity", "PERPLEXITY_API_KEY", "query", "search_domain_filter", as_written),
             ("tinyfish", "TINYFISH_API_KEY", "query", "include_domains", as_written),
             ("keenable_pro", "KEENABLE_API_KEY", "query", "include_domains", as_written),
+            ("specstream", "SPECSTREAM_API_KEY", "q", "include_domains", as_written),
             ("exa_deep", "EXA_API_KEY", "query", "includeDomains", as_written),
             ("you_highlights", "YOU_API_KEY", "query", "include_domains", as_written),
         ):

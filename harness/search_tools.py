@@ -29,6 +29,7 @@ TOOLS = (
     "nimble",
     "you",
     "keenable",
+    "specstream",
 )
 ADAPTERS = {tool: import_module(f"{__package__}.adapters.{tool}") for tool in TOOLS}
 
