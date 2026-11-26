@@ -14,6 +14,7 @@ from .tool_api import VendorCall, VendorSpec, load_setups
 
 # Each name is tools/<name>.yaml plus harness/adapters/<name>.py, in default run order.
 TOOLS = (
+    "none",
     "context",
     "brave",
     "exa",
@@ -27,6 +28,8 @@ TOOLS = (
     "perplexity",
     "nimble",
     "you",
+    "tako",
+    "keenable",
 )
 ADAPTERS = {tool: import_module(f"{__package__}.adapters.{tool}") for tool in TOOLS}
 
@@ -44,7 +47,7 @@ def capability_inventory() -> list[dict[str, Any]]:
     return [
         {
             "vendor": spec.key,
-            "search": True,
+            "search": spec.web_search,
             "native_fetch": spec.native_fetch,
             "fetch_kind": spec.fetch_kind,
             "custom_fetch": spec.custom_fetch,
@@ -62,15 +65,6 @@ def validate_vendor_keys(vendor_keys: list[str] | tuple[str, ...]) -> None:
     unknown = sorted(set(vendor_keys) - set(VENDORS))
     if unknown:
         raise ValueError(f"unknown company-research vendors: {unknown}")
-
-
-def fetch_unit_cost(spec: VendorSpec) -> float | None:
-    adapter = _ADAPTER_BY_SETUP[spec.key]
-    return adapter.fetch_unit_cost() if hasattr(adapter, "fetch_unit_cost") else spec.fetch_unit_cost_usd
-
-
-def public_dict(spec: VendorSpec) -> dict[str, Any]:
-    return spec.public_dict(fetch_unit_cost(spec))
 
 
 def dedupe(hits: list[dict[str, Any]], max_results: int) -> list[dict[str, Any]]:
@@ -120,17 +114,21 @@ def _cost(vendor_key: str, call: VendorCall, unit_cost: float | None) -> float |
     return adapter.actual_cost(call, default) if hasattr(adapter, "actual_cost") else default
 
 
-def search(
-    vendor_key: str,
-    query: str,
-    *,
-    max_results: int = 10,
-    search_context_size: str | None = None,
-) -> VendorCall:
+def search(vendor_key: str, query: str, *, max_results: int = 10) -> VendorCall:
     spec = VENDORS[vendor_key]
-    call = _ADAPTER_BY_SETUP[vendor_key].search(spec, query, max_results, search_context_size)
+    adapter = _ADAPTER_BY_SETUP[vendor_key]
+    call = adapter.search(spec, query, max_results)
     call.cost_usd = _cost(vendor_key, call, spec.search_unit_cost_usd)
-    call.hits = parse_hits(vendor_key, call.raw_response, max_results) if call.status == "ok" else []
+    call.hits = []
+    if call.status == "ok":
+        payload = call.raw_response if isinstance(call.raw_response, dict) else {}
+        try:
+            call.hits = dedupe(adapter.parse_hits(payload, max_results), max_results)
+            call.knowledge = adapter.parse_knowledge(payload, max_results) if hasattr(adapter, "parse_knowledge") else None
+        except Exception as exc:  # noqa: BLE001
+            call.status = "error"
+            call.error = f"unreadable search reply: {type(exc).__name__}: {exc}"
+            call.hits = []
     return call
 
 
@@ -184,5 +182,5 @@ def fetch(vendor_key: str, url: str, *, objective: str, max_chars: int = 12_000)
         except Exception as exc:  # noqa: BLE001
             call.status = "error"
             call.error = f"{type(exc).__name__}: {exc}"
-    call.cost_usd = _cost(vendor_key, call, fetch_unit_cost(spec))
+    call.cost_usd = _cost(vendor_key, call, spec.fetch_unit_cost_usd)
     return call

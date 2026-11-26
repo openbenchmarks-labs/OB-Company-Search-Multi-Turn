@@ -1,0 +1,14 @@
+tool: none
+# The baseline: the same agent, model and budget with no search and no fetch, so the board shows how much each tool adds.
+setups:
+  no_search:
+    provider_slug: no-search
+    provider_name: No search
+    config_slug: no-search
+    endpoint: none
+    env_keys: []
+    web_search: false
+    native_fetch: false
+    request_config: {}
+    pricing:
+      search_usd: 0

@@ -1,4 +1,6 @@
 tool: firecrawl
+# Priced at the Hobby plan, the cheapest paid plan: $19 a month for 5,000 credits, so $0.0038 a credit.
+# A search of up to 10 results is 2 credits, a page is 1 (firecrawl.dev/pricing, read 25 Nov 2026).
 setups:
   firecrawl:
     provider_slug: firecrawl-search
@@ -11,5 +13,5 @@ setups:
     fetch_kind: firecrawl_scrape
     request_config: {}
     pricing:
-      search_usd: 0.005
-      fetch_usd: 0.0025
+      search_usd: 0.0076
+      fetch_usd: 0.0038

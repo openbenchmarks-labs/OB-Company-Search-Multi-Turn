@@ -16,7 +16,6 @@ from .model_client import OPENAI_REQUIRED_ENV
 from .search_tools import (
     VENDORS,
     capability_inventory,
-    public_dict,
     required_env,
     validate_vendor_keys,
 )
@@ -131,8 +130,11 @@ def _existing_is_complete(path: Path, retry_errors: bool) -> bool:
     if not path.is_file():
         return False
     try:
-        status = json.loads(path.read_text())["result"]["status"]
+        result = json.loads(path.read_text())["result"]
+        status = result["status"]
     except (OSError, KeyError, TypeError, json.JSONDecodeError):
+        return False
+    if result.get("stop_reason"):
         return False
     return status == "ok" or (status == "error" and not retry_errors)
 
@@ -173,7 +175,7 @@ def _run_trial(
         },
         "research_mode": config.research_mode,
         "vendor_key": vendor_key,
-        "vendor": public_dict(VENDORS[vendor_key]),
+        "vendor": VENDORS[vendor_key].public_dict(),
         "case": {
             "case_key": case["case_key"],
             "question": case["question"],
@@ -190,16 +192,22 @@ def _run_trial(
     temporary = path.with_suffix(".json.tmp")
     temporary.write_text(json.dumps(artifact, indent=2, ensure_ascii=False) + "\n")
     temporary.replace(path)
-    return {"status": result.status, "path": str(path), "parse_error": parse_error}
+    return {"status": result.status, "path": str(path), "parse_error": parse_error, "stop_reason": result.stop_reason}
 
 
 def execute(config: RunnerConfig, client: Any) -> dict[str, Any]:
-    """Execute configured paid calls and persist only local JSON artifacts."""
+    """Execute configured paid calls and persist only local JSON artifacts.
+
+    A tool keeps running through failed questions, which are saved and score zero. It stops when a failure
+    would repeat on every later trial: its key refused or its account out of credit, or the model call
+    failing (our side, never the tool's miss). The tool is then reported incomplete with the reason, the
+    board refuses to build, and a resumed run retries the stopped trials."""
     config.validate()
     dataset, cases = _selected_cases(config)
 
     def run_vendor(vendor_key: str) -> dict[str, Any]:
         results: list[dict[str, Any]] = []
+        stopped: str | None = None
         for case in cases:
             with ThreadPoolExecutor(
                 max_workers=min(config.trial_concurrency, config.trial_count)
@@ -218,9 +226,11 @@ def execute(config: RunnerConfig, client: Any) -> dict[str, Any]:
                 ]
                 question_results = [future.result() for future in as_completed(futures)]
             results.extend(question_results)
-            if question_results and all(row["status"] == "error" for row in question_results):
+            reasons = sorted({row["stop_reason"] for row in question_results if row.get("stop_reason")})
+            if reasons:
+                stopped = f"stopped on {case['case_key']}: {', '.join(reasons)}"
                 break
-        return {"vendor": vendor_key, "results": results}
+        return {"vendor": vendor_key, "results": results, "complete": stopped is None, "stopped": stopped}
 
     with ThreadPoolExecutor(
         max_workers=min(config.vendor_concurrency, len(config.vendor_keys))

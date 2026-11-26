@@ -1,4 +1,5 @@
 tool: you
+# You applies site: in the query itself (you.com/docs/guides/search/search-operators), so it stays as the agent wrote it.
 setups:
   you_highlights:
     provider_slug: you-highlights

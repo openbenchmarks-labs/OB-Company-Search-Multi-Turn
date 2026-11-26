@@ -7,6 +7,7 @@ custom fetch in custom_fetch.py when its setup says so.
 
 from __future__ import annotations
 
+import re
 import time
 from dataclasses import asdict, dataclass
 from pathlib import Path
@@ -18,6 +19,10 @@ import yaml
 TOOLS_DIR = Path(__file__).resolve().parents[1] / "tools"
 REDACTED = "***REDACTED***"
 RETRYABLE_STATUS = {429, 500, 502, 503, 504}
+# The key is refused or the account is out of credit (Tavily: 432 plan limit, 433 pay-as-you-go limit):
+# every later call to the tool fails the same way.
+ACCOUNT_STATUS = {401, 402, 432, 433}
+_SITE_INCLUDE_RE = re.compile(r"(?<![-\w])site:([^\s]+)", re.I)
 
 
 @dataclass(frozen=True)
@@ -35,11 +40,11 @@ class VendorSpec:
     request_config: dict[str, Any]
     fetch_unit_cost_usd: float | None = None
     custom_fetch: bool = False
+    web_search: bool = True
 
-    def public_dict(self, fetch_unit_cost_usd: float | None) -> dict[str, Any]:
+    def public_dict(self) -> dict[str, Any]:
         value = asdict(self)
         value["env_keys"] = list(self.env_keys)
-        value["fetch_unit_cost_usd"] = fetch_unit_cost_usd
         return value
 
 
@@ -54,6 +59,10 @@ class VendorCall:
     cost_usd: float | None
     hits: list[dict[str, Any]] | None = None
     page: dict[str, Any] | None = None
+    knowledge: list[dict[str, Any]] | None = None
+
+    def account_error(self) -> bool:
+        return bool(self.attempts) and self.attempts[-1].get("status_code") in ACCOUNT_STATUS
 
 
 def tool_config(tool: str) -> dict[str, Any]:
@@ -78,6 +87,7 @@ def load_setups(tool: str) -> list[VendorSpec]:
             request_config=setup["request_config"],
             fetch_unit_cost_usd=pricing.get("fetch_usd"),
             custom_fetch=setup.get("custom_fetch", False),
+            web_search=setup.get("web_search", True),
         ))
     return specs
 
@@ -156,6 +166,32 @@ def request(
         attempts=attempts,
         cost_usd=None,
     )
+
+
+def split_site_filters(query: str) -> tuple[str, list[str]]:
+    """Take positive site: filters out of a query: the query without them, and their hosts in order."""
+    domains: list[str] = []
+    seen: set[str] = set()
+
+    def take(match: re.Match[str]) -> str:
+        raw = match.group(1).strip("\"'").rstrip("/")
+        raw = re.sub(r"^https?://", "", raw, flags=re.I).removeprefix("www.")
+        host = raw.split("/", 1)[0].strip(".").lower()
+        if host and host not in seen:
+            seen.add(host)
+            domains.append(host)
+        return " "
+
+    cleaned = re.sub(r"\s+", " ", _SITE_INCLUDE_RE.sub(take, query)).strip()
+    return cleaned, domains
+
+
+def site_scoped(spec: VendorSpec, query: str) -> tuple[str, list[str]]:
+    """With site_operator_policy set, site: filters move out of the query into the tool's domain filter."""
+    if not spec.request_config.get("site_operator_policy"):
+        return query, []
+    cleaned, domains = split_site_filters(query)
+    return cleaned or " ".join(domains) or query, domains
 
 
 def hit(url: Any, title: Any, snippet: Any, metadata: dict[str, Any] | None = None) -> dict[str, Any]:

@@ -31,6 +31,16 @@ Return each company once under its canonical public name, include its canonical
 domain when known, cite the URLs supporting it, and briefly state the evidence.
 An empty company list is valid when the evidence is insufficient."""
 
+NO_SEARCH_PROMPT = """You are a company research agent. Identify companies that satisfy ALL
+constraints in the user's question. No search or page tools are available in
+this run: answer from what you already know.
+
+Do not include a company unless you are confident it meets every constraint.
+Prefer precision over padding. Return each company once under its canonical
+public name, include its canonical domain when known, list any URLs you know
+support it, and briefly state the evidence. An empty company list is valid
+when you do not know."""
+
 WEB_SEARCH_TOOL = {
     "type": "function",
     "name": "web_search",
@@ -89,6 +99,20 @@ COMPANY_SET_SCHEMA = {
     "required": ["companies"],
     "additionalProperties": False,
 }
+
+
+class StopTool(RuntimeError):
+    """A failure every later trial would repeat: the runner stops the tool, and a resumed run retries the trial."""
+
+    reason = ""
+
+
+class VendorAccountError(StopTool):
+    reason = "tool key refused or out of credit"
+
+
+class ModelCallError(StopTool):
+    reason = "model call failed"
 
 
 @dataclass(frozen=True)
@@ -168,6 +192,7 @@ class AgentResult:
     cache_write_input_tokens: int = 0
     output_tokens: int = 0
     model_cost_usd: float | None = None
+    stop_reason: str | None = None
 
     def raw_model_payload(self) -> dict[str, Any]:
         return {
@@ -306,10 +331,10 @@ def run_agent(
     """Execute one paid agent trial. Callers own all authorization safeguards."""
     config.validate()
     spec = VENDORS[vendor_key]
-    allow_fetch = (spec.native_fetch or spec.custom_fetch) and config.max_fetches > 0
-    tools = [WEB_SEARCH_TOOL, *([WEB_FETCH_TOOL] if allow_fetch else [])]
+    allow_fetch = spec.web_search and (spec.native_fetch or spec.custom_fetch) and config.max_fetches > 0
+    tools = [*([WEB_SEARCH_TOOL] if spec.web_search else []), *([WEB_FETCH_TOOL] if allow_fetch else [])]
     conversation: list[dict[str, Any]] = [
-        {"role": "system", "content": SYSTEM_PROMPT},
+        {"role": "system", "content": SYSTEM_PROMPT if spec.web_search else NO_SEARCH_PROMPT},
         {"role": "user", "content": question},
     ]
     allowed_fetch_urls: set[str] = set()
@@ -341,9 +366,12 @@ def run_agent(
                     }
                 },
             }
-            if not final_turn:
+            if tools and not final_turn:
                 request["tools"] = tools
-            response = client.responses.create(**request)
+            try:
+                response = client.responses.create(**request)
+            except Exception as exc:  # noqa: BLE001 - our side, never the tool's miss
+                raise ModelCallError(f"{type(exc).__name__}: {exc}") from exc
             result.model_responses.append(_response_dict(response))
             input_tokens, cached_input_tokens, cache_write_input_tokens, output_tokens = _usage(response)
             result.input_tokens += input_tokens
@@ -355,7 +383,7 @@ def run_agent(
                 result.final_response = str(getattr(response, "output_text", "") or "").strip()
                 if not result.final_response:
                     raise RuntimeError(f"model returned no structured output on turn {turn_index}")
-                if not any(trace.call.status == "ok" for trace in result.searches):
+                if spec.web_search and not any(trace.call.status == "ok" for trace in result.searches):
                     raise RuntimeError("model returned without a successful vendor web search")
                 result.status = "ok"
                 break
@@ -378,21 +406,23 @@ def run_agent(
                         conversation.append(_tool_output(call, {"error": "per-turn search budget exhausted"}))
                         continue
                     searches_this_turn += 1
-                    search_kwargs: dict[str, Any] = {"max_results": config.max_results}
-                    if vendor_key == "perplexity":
-                        search_kwargs["search_context_size"] = "high" if allow_fetch else "low"
-                    vendor_call = search(vendor_key, query, **search_kwargs)
+                    vendor_call = search(vendor_key, query, max_results=config.max_results)
                     trace = SearchTrace(turn_index, len(result.searches) + 1, call_id, query, vendor_call)
                     result.searches.append(trace)
+                    if vendor_call.account_error():
+                        raise VendorAccountError(f"{vendor_key} search: {vendor_call.error}")
                     for hit in vendor_call.hits or []:
                         if hit.get("url"):
                             allowed_fetch_urls.add(urldefrag(str(hit["url"]))[0])
-                    conversation.append(_tool_output(call, {
+                    output: dict[str, Any] = {
                         "vendor": vendor_key,
                         "query": query,
                         "hits": vendor_call.hits or [],
                         "error": vendor_call.error,
-                    }))
+                    }
+                    if vendor_call.knowledge:
+                        output["knowledge"] = vendor_call.knowledge
+                    conversation.append(_tool_output(call, output))
                 elif name == "web_fetch":
                     url = str(arguments.get("url") or "").strip()
                     normalized = urldefrag(url)[0]
@@ -414,6 +444,8 @@ def run_agent(
                     except Exception as exc:  # noqa: BLE001 - recorded, the trial continues
                         vendor_call = VendorCall("error", 0, {"url": url}, None, f"{type(exc).__name__}: {exc}", [], 0.0)
                     result.fetches.append(FetchTrace(turn_index, len(result.fetches) + 1, call_id, url, vendor_call))
+                    if vendor_call.account_error():
+                        raise VendorAccountError(f"{vendor_key} fetch: {vendor_call.error}")
                     conversation.append(_tool_output(call, {"page": vendor_call.page, "error": vendor_call.error}))
                 else:
                     conversation.append(_tool_output(call, {"error": f"unknown tool {name}"}))
@@ -422,6 +454,7 @@ def run_agent(
     except Exception as exc:  # noqa: BLE001
         result.status = "error"
         result.error = f"{type(exc).__name__}: {exc}"
+        result.stop_reason = exc.reason if isinstance(exc, StopTool) else None
     result.latency_ms = round((time.perf_counter() - started) * 1000)
     try:
         result.model_cost_usd = _model_cost(
@@ -460,4 +493,5 @@ def result_manifest(result: AgentResult) -> dict[str, Any]:
         ],
         "raw_model_response": result.raw_model_payload(),
         "model_cost_usd": result.model_cost_usd,
+        "stop_reason": result.stop_reason,
     }

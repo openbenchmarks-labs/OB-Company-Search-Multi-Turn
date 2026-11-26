@@ -5,6 +5,7 @@ from __future__ import annotations
 import argparse
 import json
 import statistics
+import unicodedata
 from collections import defaultdict
 from pathlib import Path
 from typing import Any, Iterable
@@ -24,6 +25,12 @@ def _domain(value: Any) -> str:
     return (parsed.hostname or "").removeprefix("www.").rstrip(".")
 
 
+def _name(value: Any) -> str:
+    """Match names with accents folded, so Jüsto and Justo agree; entity keys keep the dataset's own form."""
+    folded = unicodedata.normalize("NFKD", str(value or ""))
+    return normalize_company_name("".join(c for c in folded if not unicodedata.combining(c)))
+
+
 def _gold_lookup(gold: list[dict[str, Any]]) -> tuple[set[str], dict[str, str]]:
     identities: set[str] = set()
     lookup: dict[str, str] = {}
@@ -34,7 +41,7 @@ def _gold_lookup(gold: list[dict[str, Any]]) -> tuple[set[str], dict[str, str]]:
         if domain:
             lookup[f"domain:{domain}"] = identity
         for name in [member.get("name"), *(member.get("aliases") or [])]:
-            normalized = normalize_company_name(str(name or ""))
+            normalized = _name(name)
             if normalized:
                 lookup[f"name:{normalized}"] = identity
     return identities, lookup
@@ -48,7 +55,7 @@ def score_artifact(artifact: dict[str, Any]) -> dict[str, Any]:
     if artifact.get("result", {}).get("status") == "ok" and not artifact.get("parse_error"):
         for index, company in enumerate(artifact.get("parsed_companies") or []):
             domain_key = f"domain:{_domain(company.get('domain'))}"
-            name_key = f"name:{normalize_company_name(str(company.get('name') or ''))}"
+            name_key = f"name:{_name(company.get('name'))}"
             identity = lookup.get(domain_key) if _domain(company.get("domain")) else None
             identity = identity or lookup.get(name_key) or f"prediction:{index}:{name_key}"
             if identity not in predicted and company.get("cited_urls"):
@@ -78,6 +85,7 @@ def score_artifact(artifact: dict[str, Any]) -> dict[str, Any]:
         "case_key": artifact["case"]["case_key"],
         "trial_index": int(artifact["trial_index"]),
         "status": result.get("status"),
+        "stop_reason": result.get("stop_reason"),
         "true_positive": true_positive,
         "false_positive": false_positive,
         "false_negative": false_negative,
@@ -123,7 +131,7 @@ def _assert_complete(
     grouped: dict[tuple[str, str], list[dict[str, Any]]], expected_trials: int
 ) -> None:
     expected_indexes = set(range(1, expected_trials + 1))
-    cases_by_mode: dict[str, set[str]] = {}
+    cases: dict[tuple[str, str], set[str]] = {}
     for (mode, vendor), rows in grouped.items():
         indexes = {row["trial_index"] for row in rows}
         if indexes != expected_indexes:
@@ -141,9 +149,16 @@ def _assert_complete(
         identities = [(row["trial_index"], row["case_key"]) for row in rows]
         if len(identities) != len(set(identities)):
             raise ValueError(f"{mode}/{vendor} contains duplicate trial/case artifacts")
-        if mode in cases_by_mode and cases_by_mode[mode] != first:
-            raise ValueError(f"{mode}/{vendor} does not cover the same cases as other vendors")
-        cases_by_mode.setdefault(mode, first)
+        cases[(mode, vendor)] = first
+    for mode in sorted({mode for mode, _ in cases}):
+        every_case = set().union(*(found for (m, _), found in cases.items() if m == mode))
+        short = sorted(
+            f"{mode}/{vendor} is missing {len(every_case - found)} of {len(every_case)} questions"
+            for (m, vendor), found in cases.items()
+            if m == mode and found != every_case
+        )
+        if short:
+            raise ValueError("; ".join(short))
 
 
 def build_leaderboard(
@@ -169,6 +184,9 @@ def build_leaderboard(
     if not grouped:
         raise ValueError("no artifacts supplied")
     _assert_complete(grouped, expected_trials)
+    stopped = sorted({f"{row['research_mode']}/{row['vendor_key']}" for row in scored if row["stop_reason"]})
+    if stopped:
+        raise ValueError(f"{', '.join(stopped)} stopped early (tool account or model failure); resume the run first")
 
     boards: dict[str, list[dict[str, Any]]] = defaultdict(list)
     for (mode, vendor_key), rows in grouped.items():
@@ -179,7 +197,8 @@ def build_leaderboard(
             ]
             for metric in QUALITY_METRICS
         }
-        costs = [float(row["cost_usd"]) for row in rows if row["cost_usd"] is not None]
+        costs = [row["cost_usd"] for row in rows]
+        unpriced = sum(cost is None for cost in costs)
         latencies = sorted(row["latency_ms"] for row in rows)
         p95_index = max(0, int(0.95 * len(latencies) + 0.999999) - 1)
         boards[mode].append(
@@ -189,12 +208,14 @@ def build_leaderboard(
                 "question_count": len({row["case_key"] for row in rows}),
                 "trial_count": expected_trials,
                 "agent_run_count": len(rows),
+                "error_run_count": sum(row["status"] != "ok" for row in rows),
                 **{metric: _percent_summary(values) for metric, values in trial_values.items()},
                 "cited_return_rate_pct": round(_mean(rows, "cited_return_rate") * 100, 2),
                 "mean_latency_ms": round(statistics.fmean(latencies)),
                 "p95_latency_ms": latencies[p95_index],
                 "mean_model_turn_count": round(_mean(rows, "model_turn_count"), 2),
-                "mean_cost_usd": round(statistics.fmean(costs), 6) if costs else None,
+                "mean_cost_usd": None if unpriced else round(statistics.fmean(costs), 6),
+                "unpriced_run_count": unpriced,
             }
         )
 

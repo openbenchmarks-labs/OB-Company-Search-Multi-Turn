@@ -1,4 +1,7 @@
 tool: perplexity
+# The same search_context_size on both boards (the field is not in Perplexity's current API reference; the
+# harness sends one value everywhere). site: filters move into search_domain_filter. Pages come from the
+# Context API ($1 per 1,000 fetched URLs, docs.perplexity.ai/docs/getting-started/pricing, read 25 Nov 2026).
 setups:
   perplexity:
     provider_slug: perplexity-search
@@ -6,10 +9,13 @@ setups:
     config_slug: perplexity
     endpoint: POST /search
     env_keys: [PERPLEXITY_API_KEY]
-    native_fetch: false
-    custom_fetch: true
+    native_fetch: true
+    fetch_endpoint: POST /v1/context
+    fetch_kind: perplexity_context
     request_config:
       max_results: 10
-      search_context_size_by_research_mode: {search_only: low, search_and_fetch: high}
+      search_context_size: low
+      site_operator_policy: search_domain_filter
     pricing:
       search_usd: 0.005
+      fetch_usd: 0.001
