@@ -178,7 +178,7 @@ class SearchToolsTest(unittest.TestCase):
             ("nimble_lite", "NIMBLE_API_KEY", "query", "include_domains", as_written),
             ("nimble_standard", "NIMBLE_API_KEY", "query", "include_domains", as_written),
             ("perplexity", "PERPLEXITY_API_KEY", "query", "search_domain_filter", as_written),
-            ("tinyfish", "TINYFISH_API_KEY", "query", "include_domains", ("seed rounds", "crunchbase.com")),
+            ("tinyfish", "TINYFISH_API_KEY", "query", "include_domains", as_written),
             ("keenable_pro", "KEENABLE_API_KEY", "query", "include_domains", as_written),
             ("exa_deep", "EXA_API_KEY", "query", "includeDomains", as_written),
             ("you_highlights", "YOU_API_KEY", "query", "include_domains", as_written),

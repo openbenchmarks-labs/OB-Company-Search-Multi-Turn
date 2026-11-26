@@ -6,16 +6,14 @@ import os
 from typing import Any
 
 from .. import tool_api
-from ..tool_api import VendorCall, VendorSpec, hit, page, site_scoped
+from ..tool_api import VendorCall, VendorSpec, hit, page
 
 
 def search(spec: VendorSpec, query: str, max_results: int) -> VendorCall:
-    sent_query, include_domains = site_scoped(spec, query)
-    params = {"query": sent_query, **({"include_domains": ",".join(include_domains)} if include_domains else {})}
     return tool_api.request(
         method="GET", url="https://api.search.tinyfish.ai",
         headers={"X-API-Key": os.environ["TINYFISH_API_KEY"], "Accept": "application/json"},
-        params=params, timeout=45,
+        params={"query": query}, timeout=45,
     )
 
 
