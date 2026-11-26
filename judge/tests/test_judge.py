@@ -64,6 +64,7 @@ class JudgeTest(unittest.TestCase):
         row = result["boards"]["search_only"][0]
         self.assertEqual(row["f1"], {"mean_pct": 66.67, "sd_pp": 57.74})
         self.assertEqual(row["rank"], 1)
+        self.assertEqual((row["median_latency_ms"], row["p95_latency_ms"]), (200, 300))
         self.assertEqual(result["aggregation"]["standard_deviation_unit"], "percentage points")
 
     def test_incomplete_trials_are_rejected(self) -> None:

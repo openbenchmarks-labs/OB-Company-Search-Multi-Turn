@@ -12,7 +12,7 @@ from typing import Any
 from .agent import AgentConfig, result_manifest, run_agent
 from .answer_parser import parse_company_set
 from .dataset import load_artifact
-from .model_client import OPENAI_REQUIRED_ENV
+from .model_client import required_model_env
 from .search_tools import (
     VENDORS,
     capability_inventory,
@@ -38,7 +38,7 @@ class RunnerConfig:
     agent: AgentConfig = AgentConfig()
 
     def validate(self) -> None:
-        if not self.dataset_path.is_file():
+        if not self.dataset_path.exists():
             raise ValueError(f"dataset does not exist: {self.dataset_path}")
         if not self.vendor_keys:
             raise ValueError("at least one vendor is required")
@@ -102,7 +102,7 @@ def runner_plan(config: RunnerConfig) -> dict[str, Any]:
         },
         "capabilities": capability_inventory(),
         "required_env_when_executed": [
-            *OPENAI_REQUIRED_ENV,
+            *required_model_env(),
             *required_env(config.vendor_keys),
         ],
         "writes": "local JSON only; paid calls require --execute --confirm-paid",

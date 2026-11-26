@@ -6,17 +6,14 @@ import os
 from typing import Any
 
 from .. import tool_api
-from ..tool_api import VendorCall, VendorSpec, hit, page, site_scoped
+from ..tool_api import VendorCall, VendorSpec, hit, page
 
 
 def search(spec: VendorSpec, query: str, max_results: int) -> VendorCall:
     search_depth = str(spec.request_config["search_depth"])
-    sent_query, include_domains = site_scoped(spec, query)
-    body: dict[str, Any] = {"query": sent_query, "search_depth": search_depth, "max_results": max_results}
+    body: dict[str, Any] = {"query": query, "search_depth": search_depth, "max_results": max_results}
     if search_depth == "advanced":
         body["chunks_per_source"] = int(spec.request_config["chunks_per_source"])
-    if include_domains:
-        body["include_domains"] = include_domains
     return tool_api.request(
         method="POST", url="https://api.tavily.com/search",
         headers={"Authorization": f"Bearer {os.environ['TAVILY_API_KEY']}", "Content-Type": "application/json"},

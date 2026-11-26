@@ -6,7 +6,7 @@ import os
 from typing import Any
 
 from .. import tool_api
-from ..tool_api import VendorCall, VendorSpec, hit, page, site_scoped
+from ..tool_api import VendorCall, VendorSpec, hit, page
 
 
 def _headers() -> dict[str, str]:
@@ -14,14 +14,11 @@ def _headers() -> dict[str, str]:
 
 
 def search(spec: VendorSpec, query: str, max_results: int) -> VendorCall:
-    sent_query, include_domains = site_scoped(spec, query)
-    body: dict[str, Any] = {
-        "query": sent_query,
+    body = {
+        "query": query,
         "max_results": min(max_results, 20),
         "search_context_size": spec.request_config["search_context_size"],
     }
-    if include_domains:
-        body["search_domain_filter"] = include_domains
     return tool_api.request(method="POST", url="https://api.perplexity.ai/search", headers=_headers(), body=body)
 
 

@@ -6,14 +6,11 @@ import os
 from typing import Any
 
 from .. import tool_api
-from ..tool_api import VendorCall, VendorSpec, hit, page, site_scoped
+from ..tool_api import VendorCall, VendorSpec, hit, page
 
 
 def search(spec: VendorSpec, query: str, max_results: int) -> VendorCall:
-    sent_query, include_domains = site_scoped(spec, query)
-    body: dict[str, Any] = {"q": sent_query, "depth": spec.request_config["depth"], "outputType": "searchResults", "maxResults": max_results}
-    if include_domains:
-        body["includeDomains"] = include_domains
+    body = {"q": query, "depth": spec.request_config["depth"], "outputType": "searchResults", "maxResults": max_results}
     return tool_api.request(
         method="POST", url="https://api.linkup.so/v1/search",
         headers={"Authorization": f"Bearer {os.environ['LINKUP_API_KEY']}", "Content-Type": "application/json"},
