@@ -1,0 +1,19 @@
+tool: specstream
+# compact=true gives each result one snippet of the lines that best match the query, read from the page.
+# SpecStream applies site: in the query itself, so site: stays as the agent wrote it.
+# Pages come from the extract endpoint, which returns the passages closest to the agent's objective.
+# $5 / 1,000 searches of up to 10 results and $0.80 / 1,000 pages. https://specstream.ai/pricing (2026-11-26)
+setups:
+  specstream:
+    provider_slug: specstream
+    provider_name: SpecStream
+    config_slug: specstream
+    endpoint: POST /v1/web-search compact=true
+    env_keys: [SPECSTREAM_API_KEY]
+    native_fetch: true
+    fetch_endpoint: POST /v1/extract
+    fetch_kind: specstream_extract
+    request_config: {compact: true}
+    pricing:
+      search_usd: 0.005
+      fetch_usd: 0.0008
