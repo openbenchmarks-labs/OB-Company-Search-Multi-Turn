@@ -8,6 +8,8 @@ A setup with `native_fetch: true` reads pages through the tool's own fetch API. 
 
 A setup with `site_operator_policy` moves `site:` filters out of the agent's query into the tool's own domain filter, for Parallel, whose docs ask for that. Every other tool gets `site:` in the query as the agent wrote it.
 
+Parallel's search takes a research objective alongside keyword queries, so its adapter sets `OBJECTIVE_SEARCH = True`: on its setups the agent's `web_search` asks for an `objective` and a short `search_query` (sent as `objective` and `search_queries`), and `web_fetch` asks for an `objective` sent to `/v1/extract`. If the agent leaves an objective empty, the query (search) or the question (fetch) is sent instead and the call is listed in the run's `objective_fallbacks`.
+
 `none.yaml` is the baseline: the same agent and model with no search and no fetch (`web_search: false`), run beside the tools so the board shows how much each one adds.
 
 To add or update a tool: edit `tools/<tool>.yaml`, run the offline tests, and open a pull request. A new search API also needs an adapter in `harness/adapters/`.

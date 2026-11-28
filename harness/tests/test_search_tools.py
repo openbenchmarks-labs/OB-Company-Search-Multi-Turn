@@ -76,6 +76,26 @@ class SearchToolsTest(unittest.TestCase):
         self.assertEqual(body["objective"], "ordinary company query")
         self.assertNotIn("source_policy", body["advanced_settings"])
 
+    def test_parallel_sends_agent_objective_and_keyword_query(self) -> None:
+        empty_call = VendorCall(
+            status="ok", latency_ms=1, raw_request={}, raw_response={"results": []},
+            error=None, attempts=[], cost_usd=None,
+        )
+        with (
+            patch.dict(os.environ, {"PARALLEL_API_KEY": "test-key"}),
+            patch("harness.tool_api.request", return_value=empty_call) as request,
+        ):
+            search("parallel_advanced", "YC fintech Series A site:ycombinator.com",
+                   objective="Find YC fintech companies that raised a Series A.")
+            body = request.call_args.kwargs["body"]
+            self.assertEqual(body["objective"], "Find YC fintech companies that raised a Series A.")
+            self.assertEqual(body["search_queries"], ["YC fintech Series A"])
+            self.assertEqual(body["advanced_settings"]["source_policy"], {"include_domains": ["ycombinator.com"]})
+            search("parallel_fast", "YC fintech Series A")  # no objective: the query stands in for it
+            body = request.call_args.kwargs["body"]
+            self.assertEqual(body["objective"], "YC fintech Series A")
+            self.assertEqual(body["search_queries"], ["YC fintech Series A"])
+
     def test_vendor_roster_and_fetch_inventory(self) -> None:
         self.assertEqual(
             set(VENDORS),

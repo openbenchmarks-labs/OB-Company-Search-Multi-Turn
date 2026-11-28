@@ -4,12 +4,13 @@ from __future__ import annotations
 
 import hashlib
 import json
+import sys
 import time
 from dataclasses import asdict, dataclass, field
 from typing import Any
 from urllib.parse import urldefrag
 
-from .search_tools import VENDORS, fetch, search
+from .search_tools import VENDORS, fetch, objective_search, search
 from .tool_api import VendorCall
 
 
@@ -62,6 +63,45 @@ WEB_FETCH_TOOL = {
         "type": "object",
         "properties": {"url": {"type": "string"}},
         "required": ["url"],
+        "additionalProperties": False,
+    },
+    "strict": True,
+}
+
+# For search APIs that take a research objective with a keyword query (adapter OBJECTIVE_SEARCH, e.g. Parallel): the
+# model writes both, and writes the objective for each page fetch. Field descriptions follow the API's documentation.
+OBJECTIVE_SEARCH_TOOL = {
+    "type": "function",
+    "name": "web_search",
+    "description": WEB_SEARCH_TOOL["description"],
+    "parameters": {
+        "type": "object",
+        "properties": {
+            "objective": {"type": "string", "description": (
+                "Natural-language description of the underlying question or goal driving the search. Used together "
+                "with search_queries to focus results on the most relevant content. Should be self-contained with "
+                "enough context to understand the intent of the search.")},
+            "search_query": {"type": "string", "description": (
+                "Concise keyword search query, 3-6 words each. Only one query is required. Used together with "
+                "objective to focus results on the most relevant content.")},
+        },
+        "required": ["objective", "search_query"],
+        "additionalProperties": False,
+    },
+    "strict": True,
+}
+
+OBJECTIVE_FETCH_TOOL = {
+    "type": "function",
+    "name": "web_fetch",
+    "description": WEB_FETCH_TOOL["description"],
+    "parameters": {
+        "type": "object",
+        "properties": {
+            "url": {"type": "string"},
+            "objective": {"type": "string", "description": "What you need from the page."},
+        },
+        "required": ["url", "objective"],
         "additionalProperties": False,
     },
     "strict": True,
@@ -192,6 +232,8 @@ class AgentResult:
     cache_write_input_tokens: int = 0
     output_tokens: int = 0
     model_cost_usd: float | None = None
+    # Objective-search calls where the agent left `objective` empty and the harness sent the query / question.
+    objective_fallbacks: list[dict[str, Any]] = field(default_factory=list)
     stop_reason: str | None = None
 
     def raw_model_payload(self) -> dict[str, Any]:
@@ -200,6 +242,7 @@ class AgentResult:
             "vendor_key": self.vendor_key,
             "responses": self.model_responses,
             "turn_count": len(self.model_responses),
+            **({"objective_fallbacks": self.objective_fallbacks} if self.objective_fallbacks else {}),
             "usage": {
                 "input_tokens": self.input_tokens,
                 "cached_input_tokens": self.cached_input_tokens,
@@ -321,6 +364,19 @@ def _model_cost(
     )
 
 
+def _flag_objective_fallback(result: AgentResult, tool: str, turn_index: int, call_index: int, target: str) -> None:
+    """Record and announce a call sent without an agent-written objective."""
+    stand_in = "query" if tool == "web_search" else "question"
+    result.objective_fallbacks.append({
+        "tool": tool, "turn_index": turn_index, "call_index": call_index, "target": target, "stand_in": stand_in,
+    })
+    print(
+        f"[objective-fallback] {result.vendor_key} {tool} #{call_index} (turn {turn_index}): agent left objective "
+        f"empty; sent the {stand_in} instead ({target[:120]})",
+        file=sys.stderr, flush=True,
+    )
+
+
 def run_agent(
     question: str,
     *,
@@ -332,7 +388,10 @@ def run_agent(
     config.validate()
     spec = VENDORS[vendor_key]
     allow_fetch = spec.web_search and (spec.native_fetch or spec.custom_fetch) and config.max_fetches > 0
-    tools = [*([WEB_SEARCH_TOOL] if spec.web_search else []), *([WEB_FETCH_TOOL] if allow_fetch else [])]
+    uses_objective = objective_search(vendor_key)
+    search_tool = OBJECTIVE_SEARCH_TOOL if uses_objective else WEB_SEARCH_TOOL
+    fetch_tool = OBJECTIVE_FETCH_TOOL if uses_objective else WEB_FETCH_TOOL
+    tools = [*([search_tool] if spec.web_search else []), *([fetch_tool] if allow_fetch else [])]
     conversation: list[dict[str, Any]] = [
         {"role": "system", "content": SYSTEM_PROMPT if spec.web_search else NO_SEARCH_PROMPT},
         {"role": "user", "content": question},
@@ -395,9 +454,12 @@ def run_agent(
                 call_id = _call_value(call, "call_id") or _call_value(call, "id")
                 arguments = _arguments(call)
                 if name == "web_search":
-                    query = str(arguments.get("query") or "").strip()
+                    query = str(arguments.get("search_query") or arguments.get("query") or "").strip()
+                    objective = str(arguments.get("objective") or "").strip() if uses_objective else ""
                     if not query:
-                        conversation.append(_tool_output(call, {"error": "query is required"}))
+                        conversation.append(_tool_output(call, {
+                            "error": "search_query is required" if uses_objective else "query is required",
+                        }))
                         continue
                     if len(result.searches) >= config.max_searches:
                         conversation.append(_tool_output(call, {"error": "search budget exhausted; answer now"}))
@@ -406,7 +468,12 @@ def run_agent(
                         conversation.append(_tool_output(call, {"error": "per-turn search budget exhausted"}))
                         continue
                     searches_this_turn += 1
-                    vendor_call = search(vendor_key, query, max_results=config.max_results)
+                    search_kwargs: dict[str, Any] = {"max_results": config.max_results}
+                    if uses_objective:
+                        search_kwargs["objective"] = objective or None
+                    vendor_call = search(vendor_key, query, **search_kwargs)
+                    if uses_objective and not objective:
+                        _flag_objective_fallback(result, "web_search", turn_index, len(result.searches) + 1, query)
                     trace = SearchTrace(turn_index, len(result.searches) + 1, call_id, query, vendor_call)
                     result.searches.append(trace)
                     if vendor_call.account_error():
@@ -417,6 +484,7 @@ def run_agent(
                     output: dict[str, Any] = {
                         "vendor": vendor_key,
                         "query": query,
+                        **({"objective": objective} if uses_objective else {}),
                         "hits": vendor_call.hits or [],
                         "error": vendor_call.error,
                     }
@@ -425,6 +493,10 @@ def run_agent(
                     conversation.append(_tool_output(call, output))
                 elif name == "web_fetch":
                     url = str(arguments.get("url") or "").strip()
+                    # Objective-search APIs: the agent writes the fetch objective; the question stands in when empty.
+                    agent_fetch_objective = str(arguments.get("objective") or "").strip() if uses_objective else ""
+                    fetch_fallback = uses_objective and not agent_fetch_objective
+                    fetch_objective = agent_fetch_objective or question
                     normalized = urldefrag(url)[0]
                     if not allow_fetch:
                         conversation.append(_tool_output(call, {"error": "vendor-native web_fetch is unavailable"}))
@@ -440,9 +512,11 @@ def run_agent(
                         continue
                     fetches_this_turn += 1
                     try:
-                        vendor_call = fetch(vendor_key, url, objective=question)
+                        vendor_call = fetch(vendor_key, url, objective=fetch_objective)
                     except Exception as exc:  # noqa: BLE001 - recorded, the trial continues
                         vendor_call = VendorCall("error", 0, {"url": url}, None, f"{type(exc).__name__}: {exc}", [], 0.0)
+                    if fetch_fallback:
+                        _flag_objective_fallback(result, "web_fetch", turn_index, len(result.fetches) + 1, url)
                     result.fetches.append(FetchTrace(turn_index, len(result.fetches) + 1, call_id, url, vendor_call))
                     if vendor_call.account_error():
                         raise VendorAccountError(f"{vendor_key} fetch: {vendor_call.error}")
@@ -493,5 +567,6 @@ def result_manifest(result: AgentResult) -> dict[str, Any]:
         ],
         "raw_model_response": result.raw_model_payload(),
         "model_cost_usd": result.model_cost_usd,
+        "objective_fallbacks": result.objective_fallbacks,
         "stop_reason": result.stop_reason,
     }

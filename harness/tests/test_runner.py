@@ -173,6 +173,72 @@ def _two_question_config(root: Path, vendors: tuple[str, ...]) -> RunnerConfig:
     )
 
 
+class ObjectiveSearchTest(unittest.TestCase):
+    def test_parallel_agent_writes_objective_and_search_query(self) -> None:
+        tool_call = [{
+            "type": "function_call", "name": "web_search", "call_id": "call-1",
+            "arguments": json.dumps({"objective": "Find YC fintech companies.", "search_query": "YC fintech"}),
+        }]
+        vendor_call = VendorCall("ok", 5, {}, {}, None, [], 0.005, hits=[])
+        for vendor_key in ("parallel_advanced", "parallel_fast"):
+            with self.subTest(vendor=vendor_key):
+                client = FakeClient([FakeResponse({}, tool_call), FakeResponse({"companies": []})])
+                with patch("harness.agent.search", return_value=vendor_call) as search_mock:
+                    result = run_agent("Find companies", vendor_key=vendor_key, client=client, config=AgentConfig())
+                self.assertEqual(result.status, "ok", result.error)
+                tool = client.responses.requests[0]["tools"][0]
+                self.assertEqual(tool["parameters"]["required"], ["objective", "search_query"])
+                search_mock.assert_called_once_with(
+                    vendor_key, "YC fintech", max_results=AgentConfig().max_results,
+                    objective="Find YC fintech companies.",
+                )
+                self.assertEqual(result.searches[0].query, "YC fintech")
+                self.assertEqual(result.objective_fallbacks, [])
+        client = FakeClient([FakeResponse({"companies": []})])
+        run_agent("Find companies", vendor_key="brave", client=client, config=AgentConfig())
+        self.assertEqual(client.responses.requests[0]["tools"][0]["parameters"]["required"], ["query"])
+
+    def test_parallel_agent_writes_fetch_objective_other_tools_use_question(self) -> None:
+        search_hit = VendorCall("ok", 5, {}, {}, None, [], 0.005, hits=[{"url": "https://a.test/page"}])
+        page = VendorCall("ok", 5, {}, {}, None, [], 0.001)
+        cases = (
+            ("parallel_advanced", {"objective": "Find X.", "search_query": "x"},
+             {"url": "https://a.test/page", "objective": "Funding round size for X."}, "Funding round size for X."),
+            ("parallel_fast", {"objective": "Find X.", "search_query": "x"},
+             {"url": "https://a.test/page", "objective": ""}, "Find companies"),
+            ("exa_deep", {"query": "x"}, {"url": "https://a.test/page"}, "Find companies"),
+        )
+        for vendor_key, search_args, fetch_args, expected in cases:
+            with self.subTest(vendor=vendor_key):
+                client = FakeClient([
+                    FakeResponse({}, [{"type": "function_call", "name": "web_search", "call_id": "s1",
+                                       "arguments": json.dumps(search_args)}]),
+                    FakeResponse({}, [{"type": "function_call", "name": "web_fetch", "call_id": "f1",
+                                       "arguments": json.dumps(fetch_args)}]),
+                    FakeResponse({"companies": []}),
+                ])
+                with (
+                    patch("harness.agent.search", return_value=search_hit),
+                    patch("harness.agent.fetch", return_value=page) as fetch_mock,
+                ):
+                    result = run_agent("Find companies", vendor_key=vendor_key, client=client, config=AgentConfig())
+                self.assertEqual(result.status, "ok", result.error)
+                fetch_mock.assert_called_once_with(vendor_key, "https://a.test/page", objective=expected)
+                self.assertEqual(
+                    client.responses.requests[0]["tools"][1]["parameters"]["required"],
+                    ["url", "objective"] if vendor_key.startswith("parallel_") else ["url"],
+                )
+                if vendor_key == "parallel_fast":  # empty fetch objective: flagged and stored with the run
+                    self.assertEqual(result.objective_fallbacks, [{
+                        "tool": "web_fetch", "turn_index": 2, "call_index": 1,
+                        "target": "https://a.test/page", "stand_in": "question",
+                    }])
+                    self.assertEqual(result.raw_model_payload()["objective_fallbacks"], result.objective_fallbacks)
+                else:
+                    self.assertEqual(result.objective_fallbacks, [])
+                    self.assertNotIn("objective_fallbacks", result.raw_model_payload())
+
+
 class SearchThenAnswerClient:
     """Searches once, then answers after it sees the search result; safe to share across threads."""
 
