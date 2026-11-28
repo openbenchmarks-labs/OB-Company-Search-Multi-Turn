@@ -113,10 +113,17 @@ def _cost(vendor_key: str, call: VendorCall, unit_cost: float | None) -> float |
     return adapter.actual_cost(call, default) if hasattr(adapter, "actual_cost") else default
 
 
-def search(vendor_key: str, query: str, *, max_results: int = 10) -> VendorCall:
+def objective_search(vendor_key: str) -> bool:
+    """True for search APIs that take a research objective with the keyword query; the agent then writes both."""
+    return bool(getattr(_ADAPTER_BY_SETUP[vendor_key], "OBJECTIVE_SEARCH", False))
+
+
+def search(vendor_key: str, query: str, *, max_results: int = 10, objective: str | None = None) -> VendorCall:
+    """`objective` reaches the adapter only on an objective_search API."""
     spec = VENDORS[vendor_key]
     adapter = _ADAPTER_BY_SETUP[vendor_key]
-    call = adapter.search(spec, query, max_results)
+    call = (adapter.search(spec, query, max_results, objective=objective) if objective_search(vendor_key)
+            else adapter.search(spec, query, max_results))
     call.cost_usd = _cost(vendor_key, call, spec.search_unit_cost_usd)
     call.hits = []
     if call.status == "ok":

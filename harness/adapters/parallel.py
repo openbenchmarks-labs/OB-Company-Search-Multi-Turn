@@ -1,4 +1,7 @@
-"""Parallel: search in the setup's mode, and extract as the page fetch."""
+"""Parallel: search in the setup's mode, and extract as the page fetch.
+
+Parallel's search takes a research objective with keyword queries, so the agent writes both (OBJECTIVE_SEARCH);
+its extract takes an objective too, which the agent writes per fetch."""
 
 from __future__ import annotations
 
@@ -9,7 +12,10 @@ from .. import tool_api
 from ..tool_api import VendorCall, VendorSpec, hit, page, site_scoped
 
 
-def search(spec: VendorSpec, query: str, max_results: int) -> VendorCall:
+OBJECTIVE_SEARCH = True
+
+
+def search(spec: VendorSpec, query: str, max_results: int, objective: str | None = None) -> VendorCall:
     mode = str(spec.request_config["mode"])
     sent_query, include_domains = site_scoped(spec, query)
     advanced_settings: dict[str, Any] = {"max_results": max_results}
@@ -19,7 +25,7 @@ def search(spec: VendorSpec, query: str, max_results: int) -> VendorCall:
         method="POST", url="https://api.parallel.ai/v1/search",
         headers={"x-api-key": os.environ["PARALLEL_API_KEY"], "Content-Type": "application/json"},
         body={
-            "objective": sent_query,
+            "objective": (objective or "").strip() or sent_query,  # the query stands in when the agent wrote none
             "search_queries": [sent_query],
             "mode": mode,
             "advanced_settings": advanced_settings,
